@@ -1,6 +1,11 @@
 import requests
 import base64
 import urllib.parse
+import oqs
+import json
+
+from Crypto.Cipher import AES
+
 
 MASTER_KMS_HOST = "" # Address of KMS, maybe there is only one
 MASTER_KMS_PORT = ""
@@ -10,6 +15,7 @@ KEY_LENGTH = 256  # In bits
 KEY_AMOUNT = 1
 TIMEOUT = 10
 VERIFY_SSL = True # If KMS cert is self-signed, set to False, but be aware
+SIGALG = "ML-DSA-87"
 
 # Unsure if needed, we will see at setup
 # HEADERS = {
@@ -19,7 +25,7 @@ VERIFY_SSL = True # If KMS cert is self-signed, set to False, but be aware
 
 
 
-def request_qkd_key() -> None:
+def request_qkd_key() -> tuple[str, bytes]:
     get_key_url = f"{MASTER_KMS_BASE_URL}/keys/{urllib.parse.urlencode(SLAVE_ID)}/enc_keys"
 
     # Based on https://www.etsi.org/deliver/etsi_gs/QKD/001_099/014/01.01.01_60/gs_qkd014v010101p.pdf Table 10
@@ -40,17 +46,54 @@ def request_qkd_key() -> None:
 
         key_info = response.json()
 
+        # Right now, we consider only 1 key
         # Check for capital K, documentation might mislead
-        for key_item in key_info["Keys"]:
-            key_ID = key_item['key_ID']
-            key = key_item['key']
-            print("------- 🔐 QKD Key Received -------")
-            print(f"Key ID: {key_ID}")
-            print(f"Key in base64: {key}\n")
-            print(f"Key in hex: {base64.b64decode(key).hex()}")
+        key_ID = key_info['Keys'][0]['key_ID']
+        key = base64.b64decode(key_info['Keys'][0]['key'])
+        return (key_ID, key)
 
     except requests.exceptions.RequestException as err:
         print(f"❌ Request failed: {err}")
 
+
+def encrypt_data(data: str, key: bytes) -> object:
+    cipher = AES.new(key, AES.MODE_GCM)
+    nonce = cipher.nonce
+    ciphertext, tag = cipher.encrypt_and_digest(data.encode())
+
+
+    return {
+        "nonce": base64.b64encode(nonce).decode('utf-8'),
+        "ciphertext": base64.b64encode(ciphertext).decode('utf-8'),
+        "tag": base64.b64encode(tag).decode('utf-8'),
+    }
+
+
+def sign_data(encrypted_data: object, key_ID: str) -> object:
+    with open("master_keys.json", "r") as file:
+        data = json.load(file)
+    private_key = data["private_key"]
+    private_key = base64.b64decode(private_key)
+    signer = oqs.Signature(SIGALG, private_key)
+
+    encrypted_data["key_ID"] = key_ID
+    signature = signer.sign(json.dumps(encrypt_data, sort_keys=True).encode())
+    encrypted_data["signature"] = base64.b64encode(signature).decode('utf-8')
+
+    return encrypted_data
+
+
+def send_data(payload: object) -> None:
+    pass
+
+
+def read_data() -> str:
+    pass
+
+
 if __name__ == "__main__":
-    request_qkd_key()
+    data = read_data()
+    key_ID, key = request_qkd_key()
+    encrypted_data = encrypt_data(key, data)
+    payload = sign_data(encrypted_data, key_ID)
+    send_data(payload)
