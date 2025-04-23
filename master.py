@@ -17,14 +17,13 @@ KEY_AMOUNT = 1
 TIMEOUT = 10
 VERIFY_SSL = True # If KMS cert is self-signed, set to False, but be aware
 SIGALG = "ML-DSA-87"
+ENCODING = "utf-8"
 
 # Unsure if needed, we will see at setup
 # HEADERS = {
 #     "Content-Type": "application/json",
 #     "Authorization": f"Bearer {API_KEY}"
 # }
-
-
 
 def request_qkd_key() -> tuple[str, bytes]:
     get_key_url = f"{MASTER_KMS_BASE_URL}/keys/{urllib.parse.urlencode(SLAVE_ID)}/enc_keys"
@@ -68,11 +67,10 @@ def encrypt_data(data: bytes, key: bytes) -> object:
     nonce = cipher.nonce
     ciphertext, tag = cipher.encrypt_and_digest(data)
 
-
     return {
-        "nonce": base64.b64encode(nonce).decode('utf-8'),
-        "ciphertext": base64.b64encode(ciphertext).decode('utf-8'),
-        "tag": base64.b64encode(tag).decode('utf-8'),
+        "nonce": base64.b64encode(nonce).decode(ENCODING),
+        "ciphertext": base64.b64encode(ciphertext).decode(ENCODING),
+        "tag": base64.b64encode(tag).decode(ENCODING),
     }
 
 
@@ -84,8 +82,8 @@ def sign_data(encrypted_data: object, key_ID: str) -> object:
     signer = oqs.Signature(SIGALG, private_key)
 
     encrypted_data["key_ID"] = key_ID
-    signature = signer.sign(json.dumps(encrypt_data, sort_keys=True).encode())
-    encrypted_data["signature"] = base64.b64encode(signature).decode('utf-8')
+    signature = signer.sign(json.dumps(encrypted_data, sort_keys=True).encode(ENCODING))
+    encrypted_data["signature"] = base64.b64encode(signature).decode(ENCODING)
 
     return encrypted_data
 
@@ -94,6 +92,7 @@ def send_data(payload: object) -> None:
     try:
         response = requests.post(url=SLAVE_URL, json=payload, timeout=10)
         response.raise_for_status()
+
     except requests.exceptions.HTTPError as http_err:
         print(f'HTTP error occurred: {http_err} - Status Code: {response.status_code}')
     except requests.exceptions.ConnectionError as conn_err:
