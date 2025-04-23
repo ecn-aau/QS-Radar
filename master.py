@@ -11,6 +11,7 @@ MASTER_KMS_HOST = "" # Address of KMS, maybe there is only one
 MASTER_KMS_PORT = ""
 MASTER_KMS_BASE_URL = f"https://{MASTER_KMS_HOST}:{MASTER_KMS_PORT}/api/v1" # KMS cert might be self-signed?
 SLAVE_ID = ""
+SLAVE_URL = ""
 KEY_LENGTH = 256  # In bits
 KEY_AMOUNT = 1
 TIMEOUT = 10
@@ -52,14 +53,20 @@ def request_qkd_key() -> tuple[str, bytes]:
         key = base64.b64decode(key_info['Keys'][0]['key'])
         return (key_ID, key)
 
+    except requests.exceptions.HTTPError as http_err:
+        print(f'HTTP error occurred: {http_err} - Status Code: {response.status_code}')
+    except requests.exceptions.ConnectionError as conn_err:
+        print(f'Connection error occurred: {conn_err}')
+    except requests.exceptions.Timeout as timeout_err:
+        print(f'Timeout error occurred: {timeout_err}')
     except requests.exceptions.RequestException as err:
-        print(f"❌ Request failed: {err}")
+        print(f"Request failed: {err}")
 
 
-def encrypt_data(data: str, key: bytes) -> object:
+def encrypt_data(data: bytes, key: bytes) -> object:
     cipher = AES.new(key, AES.MODE_GCM)
     nonce = cipher.nonce
-    ciphertext, tag = cipher.encrypt_and_digest(data.encode())
+    ciphertext, tag = cipher.encrypt_and_digest(data)
 
 
     return {
@@ -84,11 +91,22 @@ def sign_data(encrypted_data: object, key_ID: str) -> object:
 
 
 def send_data(payload: object) -> None:
-    pass
+    try:
+        response = requests.post(url=SLAVE_URL, json=payload, timeout=10)
+        response.raise_for_status()
+    except requests.exceptions.HTTPError as http_err:
+        print(f'HTTP error occurred: {http_err} - Status Code: {response.status_code}')
+    except requests.exceptions.ConnectionError as conn_err:
+        print(f'Connection error occurred: {conn_err}')
+    except requests.exceptions.Timeout as timeout_err:
+        print(f'Timeout error occurred: {timeout_err}')
+    except requests.exceptions.RequestException as req_err:
+        print(f'Unexpected error: {req_err}')
 
 
-def read_data() -> str:
-    pass
+def read_data() -> bytes:
+    with open('data.bin', 'rb') as f:
+        return f.read()
 
 
 if __name__ == "__main__":
