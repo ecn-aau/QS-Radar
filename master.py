@@ -74,14 +74,14 @@ def encrypt_data(data: bytes, key: bytes) -> object:
     }
 
 
-def sign_data(encrypted_data: object, key_ID: str) -> object:
+def sign_data(encrypted_data: object, key_id: str) -> object:
     with open("master_keys.json", "r") as file:
         data = json.load(file)
     private_key = data["private_key"]
     private_key = base64.b64decode(private_key)
     signer = oqs.Signature(SIGALG, private_key)
 
-    encrypted_data["key_ID"] = key_ID
+    encrypted_data["key_ID"] = key_id
     signature = signer.sign(json.dumps(encrypted_data, sort_keys=True).encode(ENCODING))
     encrypted_data["signature"] = base64.b64encode(signature).decode(ENCODING)
 
@@ -111,6 +111,6 @@ def read_data() -> bytes:
 if __name__ == "__main__":
     data = read_data()
     key_ID, key = request_qkd_key()
-    encrypted_data = encrypt_data(key, data)
-    payload = sign_data(encrypted_data, key_ID)
-    send_data(payload)
+    encrypted_data = encrypt_data(data=data, key=key)
+    payload = sign_data(encrypted_data=encrypted_data, key_id=key_ID)
+    send_data(payload=payload)
