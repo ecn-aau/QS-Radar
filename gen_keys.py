@@ -11,11 +11,15 @@ def gen_keys() -> object:
     # Generate master keys
     public_key, private_key = gen_keys_general()
     base64_public_key, base64_private_key = encode_keys_base64(public_key, private_key)
-    key_data["master"] = {
+    master_key_data = {
         "public_key": base64_public_key,
         "private_key": base64_private_key,
     }
+    key_data["master"] = master_key_data
     print_keys("MASTER", base64_public_key, base64_private_key)
+
+    with open("master_keys.json", "w") as master_file:
+        json.dump(master_key_data, master_file, indent=4)
 
     # Generate slave keys
     public_key, private_key = gen_keys_general()
