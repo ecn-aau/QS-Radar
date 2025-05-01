@@ -9,10 +9,10 @@ from Crypto.Cipher import AES
 import threading
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
-SLAVE_KMS_HOST = "" # Address of KMS, maybe there is only one
-SLAVE_KMS_PORT = ""
-SLAVE_KMS_BASE_URL = f"https://{SLAVE_KMS_HOST}:{SLAVE_KMS_PORT}/api/v1" # KMS cert might be self-signed?
-MASTER_ID = ""
+CLIENT_B_KMS_HOST = "" # Address of KMS, maybe there is only one
+CLIENT_B_KMS_PORT = ""
+CLIENT_B_KMS_BASE_URL = f"https://{CLIENT_B_KMS_HOST}:{CLIENT_B_KMS_PORT}/api/v1" # KMS cert might be self-signed?
+CLIENT_A_ID = ""
 TIMEOUT = 10
 VERIFY_SSL = True # If KMS cert is self-signed, set to False, but be aware
 ENCODING = "utf-8"
@@ -33,7 +33,7 @@ request_count = 1
 # }
 
 def request_qkd_key_with_ID(key_id: str) -> bytes:
-    get_key_with_IDs_url = f"{SLAVE_KMS_BASE_URL}/keys/{urllib.parse.urlencode(MASTER_ID)}/dec_keys"
+    get_key_with_IDs_url = f"{CLIENT_B_KMS_BASE_URL}/keys/{urllib.parse.urlencode(CLIENT_A_ID)}/dec_keys"
 
     # Based on https://www.etsi.org/deliver/etsi_gs/QKD/001_099/014/01.01.01_60/gs_qkd014v010101p.pdf Table 12
     payload = {
@@ -94,7 +94,7 @@ def verify_signature(payload: object) -> bool:
     }
     message = json.dumps(signed_data, sort_keys=True).encode(ENCODING)
 
-    with open("master_keys.json", "r") as file:
+    with open("clientA_keys.json", "r") as file:
         data = json.load(file)
     public_key = data["public_key"]
     public_key = base64.b64decode(public_key)
@@ -103,7 +103,7 @@ def verify_signature(payload: object) -> bool:
         return verifier.verify(message, signature, public_key)
 
 
-class SlaveHandler(BaseHTTPRequestHandler):
+class CLIENTBHandler(BaseHTTPRequestHandler):
     def do_POST(self) -> None:
         content_length = int(self.headers.get('Content-Length', 0))
         payload = self.rfile.read(content_length)
@@ -117,7 +117,7 @@ class SlaveHandler(BaseHTTPRequestHandler):
             self.wfile.write(b"Invalid JSON")
             return
 
-        threading.Thread(target=handle_request, args=(data,), daemon=True).start()
+        threading.Thread(target=self.handle_request, args=(data,), daemon=True).start()
 
         self.send_response(200)
         self.end_headers()
@@ -152,7 +152,7 @@ class SlaveHandler(BaseHTTPRequestHandler):
 
 
 def run():
-    server = HTTPServer((LISTENING_URL, LISTENING_PORT), SlaveHandler)
+    server = HTTPServer((LISTENING_URL, LISTENING_PORT), CLIENTBHandler)
     print(f"Listening on http://{LISTENING_URL}:{LISTENING_PORT}")
     try:
         server.serve_forever()
@@ -160,7 +160,7 @@ def run():
         print("Shutting down...")
         server.server_close()
     
-    with open("output_slave.txt", "w") as output:
+    with open("output_clientB.txt", "w") as output:
         for op in outputs:
             output.write(op)
 

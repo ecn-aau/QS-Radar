@@ -8,27 +8,27 @@ sigalg = "ML-DSA-87"
 def gen_keys() -> object:
     key_data = {}
 
-    # Generate master keys
+    # Generate Client A keys
     public_key, private_key = gen_keys_general()
     base64_public_key, base64_private_key = encode_keys_base64(public_key, private_key)
     master_key_data = {
         "public_key": base64_public_key,
         "private_key": base64_private_key,
     }
-    key_data["master"] = master_key_data
-    print_keys("MASTER", base64_public_key, base64_private_key)
+    key_data["clientA"] = master_key_data
+    print_keys("ClientA", base64_public_key, base64_private_key)
 
-    with open("master_keys.json", "w") as master_file:
+    with open("clientA_keys.json", "w") as master_file:
         json.dump(master_key_data, master_file, indent=4)
 
-    # Generate slave keys
+    # Generate Client B keys
     public_key, private_key = gen_keys_general()
     base64_public_key, base64_private_key = encode_keys_base64(public_key, private_key)
-    key_data["slave"] = {
+    key_data["clientB"] = {
         "public_key": base64_public_key,
         "private_key": base64_private_key,
     }
-    print_keys("SLAVE", base64_public_key, base64_private_key)
+    print_keys("ClientB", base64_public_key, base64_private_key)
 
     # Persist keys in file
     with open("keys.json", "w") as file:

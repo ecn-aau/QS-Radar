@@ -8,11 +8,11 @@ import time
 from Crypto.Cipher import AES
 
 
-MASTER_KMS_HOST = "" # Address of KMS, maybe there is only one
-MASTER_KMS_PORT = ""
-MASTER_KMS_BASE_URL = f"https://{MASTER_KMS_HOST}:{MASTER_KMS_PORT}/api/v1" # KMS cert might be self-signed?
-SLAVE_ID = ""
-SLAVE_URL = ""
+CLIENT_A_KMS_HOST = "" # Address of KMS, maybe there is only one
+CLIENT_A_KMS_PORT = ""
+CLIENT_A_KMS_BASE_URL = f"https://{CLIENT_A_KMS_HOST}:{CLIENT_A_KMS_PORT}/api/v1" # KMS cert might be self-signed?
+CLIENT_B_ID = ""
+CLIENT_B_URL = ""
 KEY_LENGTH = 256  # In bits
 KEY_AMOUNT = 1
 TIMEOUT = 10
@@ -29,7 +29,7 @@ NANO_TO_MILLI = 100000
 # }
 
 def request_qkd_key() -> tuple[str, bytes]:
-    get_key_url = f"{MASTER_KMS_BASE_URL}/keys/{urllib.parse.urlencode(SLAVE_ID)}/enc_keys"
+    get_key_url = f"{CLIENT_A_KMS_BASE_URL}/keys/{urllib.parse.urlencode(CLIENT_B_ID)}/enc_keys"
 
     # Based on https://www.etsi.org/deliver/etsi_gs/QKD/001_099/014/01.01.01_60/gs_qkd014v010101p.pdf Table 10
     payload = {
@@ -78,7 +78,7 @@ def encrypt_data(data: bytes, key: bytes) -> object:
 
 
 def sign_data(encrypted_data: object, key_id: str) -> object:
-    with open("master_keys.json", "r") as file:
+    with open("clientA_keys.json", "r") as file:
         data = json.load(file)
     private_key = data["private_key"]
     private_key = base64.b64decode(private_key)
@@ -93,7 +93,7 @@ def sign_data(encrypted_data: object, key_id: str) -> object:
 
 def send_data(payload: object) -> None:
     try:
-        response = requests.post(url=SLAVE_URL, json=payload, timeout=10)
+        response = requests.post(url=CLIENT_B_URL, json=payload, timeout=10)
         response.raise_for_status()
 
     except requests.exceptions.HTTPError as http_err:
@@ -133,6 +133,6 @@ if __name__ == "__main__":
         measured_output = f"{i+1},{(time_qkd_key - time_start) / NANO_TO_MILLI},{(time_encryption - time_qkd_key) / NANO_TO_MILLI},{(time_sign - time_encryption) / NANO_TO_MILLI},{(time_data_transfer - time_sign) / NANO_TO_MILLI},{(time_data_transfer - time_start) / NANO_TO_MILLI},{time_data_transfer}\n"
         outputs.append(measured_output)
             
-    with open("output_master.txt", "w") as output:
+    with open("output_clientA.txt", "w") as output:
         for op in outputs:
             output.write(op)
