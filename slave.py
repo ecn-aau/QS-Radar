@@ -3,9 +3,10 @@ import base64
 import urllib.parse
 import oqs
 import json
+import time
 
 from Crypto.Cipher import AES
-from threading import Thread
+import threading
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
 SLAVE_KMS_HOST = "" # Address of KMS, maybe there is only one
@@ -18,6 +19,12 @@ ENCODING = "utf-8"
 SIGALG = "ML-DSA-87"
 LISTENING_URL = ""
 LISTENING_PORT = ""
+NANO_TO_MILLI = 100000
+MAX_REQUESTS = 100000
+
+lock = threading.Lock()
+outputs = []
+request_count = 1 
 
 # Unsure if needed, we will see at setup
 # HEADERS = {
@@ -96,17 +103,6 @@ def verify_signature(payload: object) -> bool:
         return verifier.verify(message, signature, public_key)
 
 
-def handle_request(payload) -> None:
-    signature_valid = verify_signature(payload=payload)
-    if not signature_valid:
-        print('Invalid signature on payload! Tampering detected.')
-        return
-    key = request_qkd_key_with_ID(key_id=payload["key_ID"])
-    data = decrypt_data(payload=payload, key=key)
-    print(f'Data received: {data[:50].hex()}...')
-    # Check if data is the same? In theory not necessary, at least don't measure the execution time for it
-
-
 class SlaveHandler(BaseHTTPRequestHandler):
     def do_POST(self) -> None:
         content_length = int(self.headers.get('Content-Length', 0))
@@ -121,7 +117,7 @@ class SlaveHandler(BaseHTTPRequestHandler):
             self.wfile.write(b"Invalid JSON")
             return
 
-        Thread(target=handle_request, args=(data,), daemon=True).start()
+        threading.Thread(target=handle_request, args=(data,), daemon=True).start()
 
         self.send_response(200)
         self.end_headers()
@@ -130,6 +126,29 @@ class SlaveHandler(BaseHTTPRequestHandler):
     def log_message(self, format, *args):
         # Disable default logging
         return
+    
+    def handle_request(self, payload) -> None:
+        time_start = time.perf_counter_ns()
+        signature_valid = verify_signature(payload=payload)
+        time_signature_verification = time.perf_counter_ns()
+        if not signature_valid:
+            print('Invalid signature on payload! Tampering detected.')
+            return
+
+        key = request_qkd_key_with_ID(key_id=payload["key_ID"])
+        time_qkd_key = time.perf_counter_ns()
+        data = decrypt_data(payload=payload, key=key)
+        time_decrypt = time.perf_counter_ns()
+
+        # Execution ID (request_count), time of start (to measure the time the data travels), elapsed signature verification, elapsed qkd key retrieval, elapsed decryption, elapsed request handling
+        output = f"{request_count},{time_start},{(time_signature_verification - time_start) / NANO_TO_MILLI},{(time_qkd_key - time_signature_verification) / NANO_TO_MILLI},{(time_decrypt - time_qkd_key) / NANO_TO_MILLI},{(time_decrypt - time_start) / NANO_TO_MILLI}"
+
+        with lock:
+            request_count += 1
+            outputs.append(output)
+
+            if (request_count > MAX_REQUESTS):
+                self.server.shutdown()
 
 
 def run():
@@ -140,6 +159,10 @@ def run():
     except KeyboardInterrupt:
         print("Shutting down...")
         server.server_close()
+    
+    with open("output_slave.txt", "w") as output:
+        for op in outputs:
+            output.write(op)
 
 
 if __name__ == "__main__":
