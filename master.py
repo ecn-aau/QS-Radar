@@ -3,6 +3,7 @@ import base64
 import urllib.parse
 import oqs
 import json
+import time
 
 from Crypto.Cipher import AES
 
@@ -18,6 +19,8 @@ TIMEOUT = 10
 VERIFY_SSL = True # If KMS cert is self-signed, set to False, but be aware
 SIGALG = "ML-DSA-87"
 ENCODING = "utf-8"
+EXECUTION_AMOUNT = 100000
+NANO_TO_MILLI = 100000
 
 # Unsure if needed, we will see at setup
 # HEADERS = {
@@ -110,7 +113,20 @@ def read_data() -> bytes:
 
 if __name__ == "__main__":
     data = read_data()
-    key_ID, key = request_qkd_key()
-    encrypted_data = encrypt_data(data=data, key=key)
-    payload = sign_data(encrypted_data=encrypted_data, key_id=key_ID)
-    send_data(payload=payload)
+    with open("output.txt", "w") as output:
+        for i in range(EXECUTION_AMOUNT):
+            time_start = time.perf_counter_ns()
+
+            key_ID, key = request_qkd_key()
+            time_elapsed_qkd_key = time.perf_counter_ns()
+
+            encrypted_data = encrypt_data(data=data, key=key)
+            time_elapsed_encryption = time.perf_counter_ns()
+
+            payload = sign_data(encrypted_data=encrypted_data, key_id=key_ID)
+            time_elapsed_sign = time.perf_counter_ns()
+
+            send_data(payload=payload)
+            time_elapsed_data_transef = time.perf_counter_ns()
+            measured_output = f"{(time_elapsed_qkd_key - time_start) / NANO_TO_MILLI},{(time_elapsed_encryption - time_elapsed_qkd_key) / NANO_TO_MILLI},{(time_elapsed_sign - time_elapsed_encryption) / NANO_TO_MILLI},{(time_elapsed_data_transef - time_elapsed_sign) / NANO_TO_MILLI},{(time_elapsed_data_transef - time_start) / NANO_TO_MILLI}\n"
+            output.write(measured_output)
