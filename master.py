@@ -130,7 +130,7 @@ if __name__ == "__main__":
         send_data(payload=payload)
         time_data_transfer = time.perf_counter_ns()
         # Execution id, elapsed qkd key generation, elapsed encryption, elapsed signature generation, elapsed transmitting data, elapsed all time, end time
-        measured_output = f"{i},{(time_qkd_key - time_start) / NANO_TO_MILLI},{(time_encryption - time_qkd_key) / NANO_TO_MILLI},{(time_sign - time_encryption) / NANO_TO_MILLI},{(time_data_transfer - time_sign) / NANO_TO_MILLI},{(time_data_transfer - time_start) / NANO_TO_MILLI},{time_data_transfer}\n"
+        measured_output = f"{i+1},{(time_qkd_key - time_start) / NANO_TO_MILLI},{(time_encryption - time_qkd_key) / NANO_TO_MILLI},{(time_sign - time_encryption) / NANO_TO_MILLI},{(time_data_transfer - time_sign) / NANO_TO_MILLI},{(time_data_transfer - time_start) / NANO_TO_MILLI},{time_data_transfer}\n"
         outputs.append(measured_output)
             
     with open("output_master.txt", "w") as output:
