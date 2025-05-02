@@ -11,15 +11,15 @@ def gen_keys() -> object:
     # Generate Client A keys
     public_key, private_key = gen_keys_general()
     base64_public_key, base64_private_key = encode_keys_base64(public_key, private_key)
-    master_key_data = {
+    clientA_key_data = {
         "public_key": base64_public_key,
         "private_key": base64_private_key,
     }
-    key_data["clientA"] = master_key_data
+    key_data["clientA"] = clientA_key_data
     print_keys("ClientA", base64_public_key, base64_private_key)
 
-    with open("clientA_keys.json", "w") as master_file:
-        json.dump(master_key_data, master_file, indent=4)
+    with open("clientA_keys.json", "w") as clientA_file:
+        json.dump(clientA_key_data, clientA_file, indent=4)
 
     # Generate Client B keys
     public_key, private_key = gen_keys_general()

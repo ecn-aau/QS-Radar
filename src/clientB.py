@@ -94,7 +94,7 @@ def verify_signature(payload: object) -> bool:
     }
     message = json.dumps(signed_data, sort_keys=True).encode(ENCODING)
 
-    with open("clientA_keys.json", "r") as file:
+    with open("../keys/clientA_keys.json", "r") as file:
         data = json.load(file)
     public_key = data["public_key"]
     public_key = base64.b64decode(public_key)
@@ -160,7 +160,7 @@ def run():
         print("Shutting down...")
         server.server_close()
     
-    with open("output_clientB.txt", "w") as output:
+    with open("../out/output_clientB.txt", "w") as output:
         for op in outputs:
             output.write(op)
 

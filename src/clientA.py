@@ -78,7 +78,7 @@ def encrypt_data(data: bytes, key: bytes) -> object:
 
 
 def sign_data(encrypted_data: object, key_id: str) -> object:
-    with open("clientA_keys.json", "r") as file:
+    with open("../keys/clientA_keys.json", "r") as file:
         data = json.load(file)
     private_key = data["private_key"]
     private_key = base64.b64decode(private_key)
@@ -107,7 +107,7 @@ def send_data(payload: object) -> None:
 
 
 def read_data() -> bytes:
-    with open('data.bin', 'rb') as f:
+    with open('../data/data.bin', 'rb') as f:
         return f.read()
 
 outputs = []
@@ -133,6 +133,6 @@ if __name__ == "__main__":
         measured_output = f"{i+1},{(time_qkd_key - time_start) / NANO_TO_MILLI},{(time_encryption - time_qkd_key) / NANO_TO_MILLI},{(time_sign - time_encryption) / NANO_TO_MILLI},{(time_data_transfer - time_sign) / NANO_TO_MILLI},{(time_data_transfer - time_start) / NANO_TO_MILLI},{time_data_transfer}\n"
         outputs.append(measured_output)
             
-    with open("output_clientA.txt", "w") as output:
+    with open("../out/output_clientA.txt", "w") as output:
         for op in outputs:
             output.write(op)

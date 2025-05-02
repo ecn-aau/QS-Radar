@@ -3,7 +3,7 @@ import json
 import base64
 import oqs
 
-from master import sign_data, encrypt_data, ENCODING, SIGALG
+from src.clientA import sign_data, encrypt_data, ENCODING, SIGALG
 from Crypto.Cipher import AES
 
 MESSAGE = b"Hello world!"
@@ -17,9 +17,9 @@ MOCK_DATA = {
 MOCK_KEY_ID = "bc077000-d4db-499d-b093-d24fe5d33be0"
 
 
-class TestMasterUtils(unittest.TestCase):
+class TestClientAUtils(unittest.TestCase):
     def test_sign_data_true(self):
-        with open("master_keys.json", "r") as file:
+        with open("../keys/clientA_keys.json", "r") as file:
             data = json.load(file)
         public_key = data["public_key"]
         public_key = base64.b64decode(public_key)
@@ -36,7 +36,7 @@ class TestMasterUtils(unittest.TestCase):
         self.assertTrue(verifier.verify(verification_data, signature_bytes, public_key))
 
     def test_sign_data_message_false(self):
-        with open("master_keys.json", "r") as file:
+        with open("../keys/clientA_keys.json", "r") as file:
             data = json.load(file)
         public_key = data["public_key"]
         public_key = base64.b64decode(public_key)
@@ -55,7 +55,7 @@ class TestMasterUtils(unittest.TestCase):
         self.assertFalse(verifier.verify(verification_data, signature_bytes, public_key))
 
     def test_sign_data_key_false(self):
-        with open("master_keys.json", "r") as file:
+        with open("../keys/clientA_keys.json", "r") as file:
             data = json.load(file)
         public_key = data["public_key"]
         public_key = base64.b64decode(public_key)
