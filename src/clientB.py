@@ -1,6 +1,5 @@
 import requests
 import base64
-import urllib.parse
 import oqs
 import json
 import time
@@ -9,16 +8,13 @@ from Crypto.Cipher import AES
 import threading
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
-CLIENT_B_KMS_HOST = "" # Address of KMS, maybe there is only one
-CLIENT_B_KMS_PORT = ""
+CLIENT_B_KMS_HOST = "192.168.3.128" # Address of KMS, maybe there is only one
+CLIENT_B_KMS_PORT = "8200"
 CLIENT_B_KMS_BASE_URL = f"https://{CLIENT_B_KMS_HOST}:{CLIENT_B_KMS_PORT}/api/v1" # KMS cert might be self-signed?
-CLIENT_A_ID = ""
-TIMEOUT = 10
-VERIFY_SSL = True # If KMS cert is self-signed, set to False, but be aware
-ENCODING = "utf-8"
+CLIENT_A_ID = "Alice254250"
 SIGALG = "ML-DSA-87"
-LISTENING_URL = ""
-LISTENING_PORT = ""
+LISTENING_URL = "localhost"
+LISTENING_PORT = 8080
 NANO_TO_MILLI = 100000
 MAX_REQUESTS = 100000
 
@@ -26,14 +22,8 @@ lock = threading.Lock()
 outputs = []
 request_count = 1 
 
-# Unsure if needed, we will see at setup
-# HEADERS = {
-#     "Content-Type": "application/json",
-#     "Authorization": f"Bearer {API_KEY}"
-# }
-
 def request_qkd_key_with_ID(key_id: str) -> bytes:
-    get_key_with_IDs_url = f"{CLIENT_B_KMS_BASE_URL}/keys/{urllib.parse.urlencode(CLIENT_A_ID)}/dec_keys"
+    get_key_with_IDs_url = f"{CLIENT_B_KMS_BASE_URL}/keys/{CLIENT_A_ID}/dec_keys"
 
     # Based on https://www.etsi.org/deliver/etsi_gs/QKD/001_099/014/01.01.01_60/gs_qkd014v010101p.pdf Table 12
     payload = {
@@ -47,17 +37,12 @@ def request_qkd_key_with_ID(key_id: str) -> bytes:
     try:
         response = requests.post(
             url = get_key_with_IDs_url,
-            # headers = HEADERS,
             json = payload,
-            timeout = TIMEOUT,
-            verify = VERIFY_SSL
+            verify = 'ca-cert.crt'
         )
         response.raise_for_status()
 
         key_info = response.json()
-
-        # Right now, we consider only 1 key
-        # Check for capital K, documentation might mislead
         return base64.b64decode(key_info['Keys'][0]['key'])
 
     except requests.exceptions.HTTPError as http_err:
@@ -89,16 +74,16 @@ def verify_signature(payload: object) -> bool:
     signed_data = {
         "nonce": payload["nonce"],
         "ciphertext": payload["ciphertext"],
-        "tag": payload["ciphertext"],
+        "tag": payload["tag"],
         "key_ID": payload["key_ID"],
     }
-    message = json.dumps(signed_data, sort_keys=True).encode(ENCODING)
+    message = json.dumps(signed_data, sort_keys=True).encode()
 
     with open("../keys/clientA_keys.json", "r") as file:
         data = json.load(file)
     public_key = data["public_key"]
     public_key = base64.b64decode(public_key)
-
+    
     with oqs.Signature(SIGALG) as verifier:
         return verifier.verify(message, signature, public_key)
 
@@ -110,7 +95,7 @@ class CLIENTBHandler(BaseHTTPRequestHandler):
 
         try:
             data = json.loads(payload)
-            print(f"Received JSON: {data}")
+            # print(f"Received JSON: {data}")
         except json.JSONDecodeError:
             self.send_response(400)
             self.end_headers()
@@ -128,27 +113,30 @@ class CLIENTBHandler(BaseHTTPRequestHandler):
         return
     
     def handle_request(self, payload) -> None:
-        time_start = time.perf_counter_ns()
+        # time_start = time.perf_counter_ns()
         signature_valid = verify_signature(payload=payload)
-        time_signature_verification = time.perf_counter_ns()
+        # time_signature_verification = time.perf_counter_ns()
         if not signature_valid:
             print('Invalid signature on payload! Tampering detected.')
             return
+        else:
+            print("Valid signature!")
 
         key = request_qkd_key_with_ID(key_id=payload["key_ID"])
-        time_qkd_key = time.perf_counter_ns()
+        # time_qkd_key = time.perf_counter_ns()
         data = decrypt_data(payload=payload, key=key)
-        time_decrypt = time.perf_counter_ns()
 
-        # Execution ID (request_count), time of start (to measure the time the data travels), elapsed signature verification, elapsed qkd key retrieval, elapsed decryption, elapsed request handling
-        output = f"{request_count},{time_start},{(time_signature_verification - time_start) / NANO_TO_MILLI},{(time_qkd_key - time_signature_verification) / NANO_TO_MILLI},{(time_decrypt - time_qkd_key) / NANO_TO_MILLI},{(time_decrypt - time_start) / NANO_TO_MILLI}"
+        # time_decrypt = time.perf_counter_ns()
 
-        with lock:
-            request_count += 1
-            outputs.append(output)
+        # # Execution ID (request_count), time of start (to measure the time the data travels), elapsed signature verification, elapsed qkd key retrieval, elapsed decryption, elapsed request handling
+        # output = f"{request_count},{time_start},{(time_signature_verification - time_start) / NANO_TO_MILLI},{(time_qkd_key - time_signature_verification) / NANO_TO_MILLI},{(time_decrypt - time_qkd_key) / NANO_TO_MILLI},{(time_decrypt - time_start) / NANO_TO_MILLI}"
 
-            if (request_count > MAX_REQUESTS):
-                self.server.shutdown()
+        # with lock:
+        #     request_count += 1
+        #     outputs.append(output)
+
+        #     if (request_count > MAX_REQUESTS):
+        #         self.server.shutdown()
 
 
 def run():
@@ -160,9 +148,9 @@ def run():
         print("Shutting down...")
         server.server_close()
     
-    with open("../out/output_clientB.txt", "w") as output:
-        for op in outputs:
-            output.write(op)
+    # with open("../out/output_clientB.txt", "w") as output:
+    #     for op in outputs:
+    #         output.write(op)
 
 
 if __name__ == "__main__":

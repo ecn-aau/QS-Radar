@@ -1,6 +1,5 @@
 import requests
 import base64
-import urllib.parse
 import oqs
 import json
 import time
@@ -12,12 +11,13 @@ CLIENT_A_KMS_HOST = "192.168.3.126" # Address of KMS, maybe there is only one
 CLIENT_A_KMS_PORT = "8200"
 CLIENT_A_KMS_BASE_URL = f"https://{CLIENT_A_KMS_HOST}:{CLIENT_A_KMS_PORT}/api/v1" # KMS cert might be self-signed?
 CLIENT_B_ID = "Bob254250"
-CLIENT_B_URL = "192.168.3.128"
+CLIENT_B_HOST = "localhost"
+CLIENT_B_PORT = 8080
+CLIENT_B_URL = f"http://{CLIENT_B_HOST}:{CLIENT_B_PORT}"
 KEY_LENGTH = 256  # In bits
 KEY_AMOUNT = 1
 TIMEOUT = 10
 SIGALG = "ML-DSA-87"
-ENCODING = "utf-8"
 EXECUTION_AMOUNT = 100000
 NANO_TO_MILLI = 100000
 
@@ -61,9 +61,9 @@ def encrypt_data(data: bytes, key: bytes) -> object:
     ciphertext, tag = cipher.encrypt_and_digest(data)
 
     return {
-        "nonce": base64.b64encode(nonce).decode(ENCODING),
-        "ciphertext": base64.b64encode(ciphertext).decode(ENCODING),
-        "tag": base64.b64encode(tag).decode(ENCODING),
+        "nonce": base64.b64encode(nonce).decode(),
+        "ciphertext": base64.b64encode(ciphertext).decode(),
+        "tag": base64.b64encode(tag).decode(),
     }
 
 
@@ -75,8 +75,8 @@ def sign_data(encrypted_data: object, key_id: str) -> object:
     signer = oqs.Signature(SIGALG, private_key)
 
     encrypted_data["key_ID"] = key_id
-    signature = signer.sign(json.dumps(encrypted_data, sort_keys=True).encode(ENCODING))
-    encrypted_data["signature"] = base64.b64encode(signature).decode(ENCODING)
+    signature = signer.sign(json.dumps(encrypted_data, sort_keys=True).encode())
+    encrypted_data["signature"] = base64.b64encode(signature).decode()
 
     return encrypted_data
 
@@ -115,6 +115,7 @@ if __name__ == "__main__":
         # time_encryption = time.perf_counter_ns()
 
         payload = sign_data(encrypted_data=encrypted_data, key_id=key_ID)
+        # print(payload)
         # time_sign = time.perf_counter_ns()
 
         send_data(payload=payload)
@@ -123,7 +124,7 @@ if __name__ == "__main__":
         # measured_output = f"{i+1},{(time_qkd_key - time_start) / NANO_TO_MILLI},{(time_encryption - time_qkd_key) / NANO_TO_MILLI},{(time_sign - time_encryption) / NANO_TO_MILLI},{(time_data_transfer - time_sign) / NANO_TO_MILLI},{(time_data_transfer - time_start) / NANO_TO_MILLI},{time_data_transfer}\n"
         # outputs.append(measured_output)
         
-        
+
 
 
     # print(f"ID: {key_ID}\nKey: {key.hex()}")
