@@ -1,11 +1,11 @@
 import requests
 import base64
 import urllib.parse
-# import oqs
+import oqs
 import json
 import time
 
-# from Crypto.Cipher import AES
+from Crypto.Cipher import AES
 
 
 CLIENT_A_KMS_HOST = "192.168.3.126" # Address of KMS, maybe there is only one
@@ -16,7 +16,6 @@ CLIENT_B_URL = "192.168.3.128"
 KEY_LENGTH = 256  # In bits
 KEY_AMOUNT = 1
 TIMEOUT = 10
-VERIFY_SSL = True # If KMS cert is self-signed, set to False, but be aware
 SIGALG = "ML-DSA-87"
 ENCODING = "utf-8"
 EXECUTION_AMOUNT = 100000
@@ -104,27 +103,32 @@ def read_data() -> bytes:
 outputs = []
 
 if __name__ == "__main__":
-    # data = read_data()
+    data = read_data()
     
-    # for i in range(10): #EXECUTION_AMOUNT):
+    for i in range(1): #EXECUTION_AMOUNT):
         # time_start = time.perf_counter_ns()
 
-    key_ID, key = request_qkd_key()
+        key_ID, key = request_qkd_key()
         # time_qkd_key = time.perf_counter_ns()
 
-        # encrypted_data = encrypt_data(data=data, key=key)
+        encrypted_data = encrypt_data(data=data, key=key)
         # time_encryption = time.perf_counter_ns()
 
-        # payload = sign_data(encrypted_data=encrypted_data, key_id=key_ID)
+        payload = sign_data(encrypted_data=encrypted_data, key_id=key_ID)
         # time_sign = time.perf_counter_ns()
 
-        # send_data(payload=payload)
+        send_data(payload=payload)
         # time_data_transfer = time.perf_counter_ns()
         # Execution id, elapsed qkd key generation, elapsed encryption, elapsed signature generation, elapsed transmitting data, elapsed all time, end time
         # measured_output = f"{i+1},{(time_qkd_key - time_start) / NANO_TO_MILLI},{(time_encryption - time_qkd_key) / NANO_TO_MILLI},{(time_sign - time_encryption) / NANO_TO_MILLI},{(time_data_transfer - time_sign) / NANO_TO_MILLI},{(time_data_transfer - time_start) / NANO_TO_MILLI},{time_data_transfer}\n"
         # outputs.append(measured_output)
         
-    print(f"ID: {key_ID}\nKey: {key.hex()}")
+        
+
+
+    # print(f"ID: {key_ID}\nKey: {key.hex()}")
+    # print(f"Encrypted data: {encrypted_data}")
+    # print(f"Payload: {payload}")
     
     # with open("../out/output_clientA.txt", "w") as output:
       #  for op in outputs:
