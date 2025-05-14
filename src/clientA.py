@@ -105,7 +105,7 @@ outputs = []
 if __name__ == "__main__":
     data = read_data()
     
-    for i in range(1): #EXECUTION_AMOUNT):
+    for i in range(EXECUTION_AMOUNT):
         # time_start = time.perf_counter_ns()
 
         key_ID, key = request_qkd_key()

@@ -119,8 +119,6 @@ class CLIENTBHandler(BaseHTTPRequestHandler):
         if not signature_valid:
             print('Invalid signature on payload! Tampering detected.')
             return
-        else:
-            print("Valid signature!")
 
         key = request_qkd_key_with_ID(key_id=payload["key_ID"])
         # time_qkd_key = time.perf_counter_ns()
@@ -131,12 +129,15 @@ class CLIENTBHandler(BaseHTTPRequestHandler):
         # # Execution ID (request_count), time of start (to measure the time the data travels), elapsed signature verification, elapsed qkd key retrieval, elapsed decryption, elapsed request handling
         # output = f"{request_count},{time_start},{(time_signature_verification - time_start) / NANO_TO_MILLI},{(time_qkd_key - time_signature_verification) / NANO_TO_MILLI},{(time_decrypt - time_qkd_key) / NANO_TO_MILLI},{(time_decrypt - time_start) / NANO_TO_MILLI}"
 
-        # with lock:
-        #     request_count += 1
-        #     outputs.append(output)
+        with lock:
+            global request_count
+            print(f"Request no. {request_count}, key ID: {payload['key_ID']}")
+            request_count += 1
+            
+            # outputs.append(output)
 
-        #     if (request_count > MAX_REQUESTS):
-        #         self.server.shutdown()
+            # if (request_count > MAX_REQUESTS):
+            #     self.server.shutdown()
 
 
 def run():
