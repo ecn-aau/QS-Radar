@@ -1,18 +1,18 @@
 import requests
 import base64
 import urllib.parse
-import oqs
+# import oqs
 import json
 import time
 
-from Crypto.Cipher import AES
+# from Crypto.Cipher import AES
 
 
-CLIENT_A_KMS_HOST = "" # Address of KMS, maybe there is only one
-CLIENT_A_KMS_PORT = ""
+CLIENT_A_KMS_HOST = "192.168.3.126" # Address of KMS, maybe there is only one
+CLIENT_A_KMS_PORT = "8200"
 CLIENT_A_KMS_BASE_URL = f"https://{CLIENT_A_KMS_HOST}:{CLIENT_A_KMS_PORT}/api/v1" # KMS cert might be self-signed?
-CLIENT_B_ID = ""
-CLIENT_B_URL = ""
+CLIENT_B_ID = "Bob254250"
+CLIENT_B_URL = "192.168.3.128"
 KEY_LENGTH = 256  # In bits
 KEY_AMOUNT = 1
 TIMEOUT = 10
@@ -22,14 +22,9 @@ ENCODING = "utf-8"
 EXECUTION_AMOUNT = 100000
 NANO_TO_MILLI = 100000
 
-# Unsure if needed, we will see at setup
-# HEADERS = {
-#     "Content-Type": "application/json",
-#     "Authorization": f"Bearer {API_KEY}"
-# }
 
 def request_qkd_key() -> tuple[str, bytes]:
-    get_key_url = f"{CLIENT_A_KMS_BASE_URL}/keys/{urllib.parse.urlencode(CLIENT_B_ID)}/enc_keys"
+    get_key_url = f"{CLIENT_A_KMS_BASE_URL}/keys/{CLIENT_B_ID}/enc_keys"
 
     # Based on https://www.etsi.org/deliver/etsi_gs/QKD/001_099/014/01.01.01_60/gs_qkd014v010101p.pdf Table 10
     payload = {
@@ -40,17 +35,13 @@ def request_qkd_key() -> tuple[str, bytes]:
     try:
         response = requests.post(
             url = get_key_url,
-            # headers = HEADERS,
             json = payload,
-            timeout = TIMEOUT,
-            verify = VERIFY_SSL
+            verify = 'ca-cert.crt'
         )
         response.raise_for_status()
 
         key_info = response.json()
 
-        # Right now, we consider only 1 key
-        # Check for capital K, documentation might mislead
         key_ID = key_info['Keys'][0]['key_ID']
         key = base64.b64decode(key_info['Keys'][0]['key'])
         return (key_ID, key)
@@ -113,26 +104,28 @@ def read_data() -> bytes:
 outputs = []
 
 if __name__ == "__main__":
-    data = read_data()
+    # data = read_data()
     
-    for i in range(EXECUTION_AMOUNT):
-        time_start = time.perf_counter_ns()
+    # for i in range(10): #EXECUTION_AMOUNT):
+        # time_start = time.perf_counter_ns()
 
-        key_ID, key = request_qkd_key()
-        time_qkd_key = time.perf_counter_ns()
+    key_ID, key = request_qkd_key()
+        # time_qkd_key = time.perf_counter_ns()
 
-        encrypted_data = encrypt_data(data=data, key=key)
-        time_encryption = time.perf_counter_ns()
+        # encrypted_data = encrypt_data(data=data, key=key)
+        # time_encryption = time.perf_counter_ns()
 
-        payload = sign_data(encrypted_data=encrypted_data, key_id=key_ID)
-        time_sign = time.perf_counter_ns()
+        # payload = sign_data(encrypted_data=encrypted_data, key_id=key_ID)
+        # time_sign = time.perf_counter_ns()
 
-        send_data(payload=payload)
-        time_data_transfer = time.perf_counter_ns()
+        # send_data(payload=payload)
+        # time_data_transfer = time.perf_counter_ns()
         # Execution id, elapsed qkd key generation, elapsed encryption, elapsed signature generation, elapsed transmitting data, elapsed all time, end time
-        measured_output = f"{i+1},{(time_qkd_key - time_start) / NANO_TO_MILLI},{(time_encryption - time_qkd_key) / NANO_TO_MILLI},{(time_sign - time_encryption) / NANO_TO_MILLI},{(time_data_transfer - time_sign) / NANO_TO_MILLI},{(time_data_transfer - time_start) / NANO_TO_MILLI},{time_data_transfer}\n"
-        outputs.append(measured_output)
-            
-    with open("../out/output_clientA.txt", "w") as output:
-        for op in outputs:
-            output.write(op)
+        # measured_output = f"{i+1},{(time_qkd_key - time_start) / NANO_TO_MILLI},{(time_encryption - time_qkd_key) / NANO_TO_MILLI},{(time_sign - time_encryption) / NANO_TO_MILLI},{(time_data_transfer - time_sign) / NANO_TO_MILLI},{(time_data_transfer - time_start) / NANO_TO_MILLI},{time_data_transfer}\n"
+        # outputs.append(measured_output)
+        
+    print(f"ID: {key_ID}\nKey: {key.hex()}")
+    
+    # with open("../out/output_clientA.txt", "w") as output:
+      #  for op in outputs:
+       #     output.write(op)
