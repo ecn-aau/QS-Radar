@@ -69,7 +69,7 @@ def decrypt_data(payload: object, key: bytes) -> bytes:
         print("Decryption failed or data tampered")
 
 
-def verify_signature(payload: object) -> bool:
+def verify_signature(payload: object, public_key: bytes) -> bool:
     signature = base64.b64decode(payload["signature"])
     signed_data = {
         "nonce": payload["nonce"],
@@ -78,17 +78,21 @@ def verify_signature(payload: object) -> bool:
         "key_ID": payload["key_ID"],
     }
     message = json.dumps(signed_data, sort_keys=True).encode()
-
-    with open("../keys/clientA_keys.json", "r") as file:
-        data = json.load(file)
-    public_key = data["public_key"]
-    public_key = base64.b64decode(public_key)
-    
     with oqs.Signature(SIGALG) as verifier:
         return verifier.verify(message, signature, public_key)
 
 
+def get_public_key() -> bytes:
+    with open("../keys/clientA_keys.json", "r") as file:
+        data = json.load(file)
+    public_key = data["public_key"]
+    return base64.b64decode(public_key)
+
+
 class CLIENTBHandler(BaseHTTPRequestHandler):
+    def __init__(self, paramters):
+        self.pub_key = get_public_key()
+
     def do_POST(self) -> None:
         content_length = int(self.headers.get('Content-Length', 0))
         payload = self.rfile.read(content_length)
@@ -114,7 +118,7 @@ class CLIENTBHandler(BaseHTTPRequestHandler):
     
     def handle_request(self, payload) -> None:
         # time_start = time.perf_counter_ns()
-        signature_valid = verify_signature(payload=payload)
+        signature_valid = verify_signature(payload=payload, public_key=self.pub_key)
         # time_signature_verification = time.perf_counter_ns()
         if not signature_valid:
             print('Invalid signature on payload! Tampering detected.')

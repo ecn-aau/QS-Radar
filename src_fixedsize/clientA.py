@@ -67,11 +67,7 @@ def encrypt_data(data: bytes, key: bytes) -> object:
     }
 
 
-def sign_data(encrypted_data: object, key_id: str) -> object:
-    with open("../keys/clientA_keys.json", "r") as file:
-        data = json.load(file)
-    private_key = data["private_key"]
-    private_key = base64.b64decode(private_key)
+def sign_data(encrypted_data: object, key_id: str, private_key: bytes) -> object:
     signer = oqs.Signature(SIGALG, private_key)
 
     encrypted_data["key_ID"] = key_id
@@ -100,11 +96,20 @@ def read_data() -> bytes:
     with open('../data/data.bin', 'rb') as f:
         return f.read()
 
+
+def get_private_key() -> bytes:
+    with open("../keys/clientA_keys.json", "r") as file:
+        data = json.load(file)
+    private_key = data["private_key"]
+    return base64.b64decode(private_key)
+
+
 outputs = []
 
 if __name__ == "__main__":
     data = read_data()
-    
+    priv_key = get_private_key()
+
     for i in range(EXECUTION_AMOUNT):
         # time_start = time.perf_counter_ns()
 
@@ -114,7 +119,7 @@ if __name__ == "__main__":
         encrypted_data = encrypt_data(data=data, key=key)
         # time_encryption = time.perf_counter_ns()
 
-        payload = sign_data(encrypted_data=encrypted_data, key_id=key_ID)
+        payload = sign_data(encrypted_data=encrypted_data, key_id=key_ID, private_key=priv_key)
         # print(payload)
         # time_sign = time.perf_counter_ns()
 
