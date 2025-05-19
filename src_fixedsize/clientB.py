@@ -117,31 +117,30 @@ class CLIENTBHandler(BaseHTTPRequestHandler):
         return
     
     def handle_request(self, payload) -> None:
-        # time_start = time.perf_counter_ns()
+        time_start = time.perf_counter_ns()
         signature_valid = verify_signature(payload=payload, public_key=self.pub_key)
-        # time_signature_verification = time.perf_counter_ns()
+        time_signature_verification = time.perf_counter_ns()
         if not signature_valid:
             print('Invalid signature on payload! Tampering detected.')
             return
 
         key = request_qkd_key_with_ID(key_id=payload["key_ID"])
-        # time_qkd_key = time.perf_counter_ns()
+        time_qkd_key = time.perf_counter_ns()
+
         data = decrypt_data(payload=payload, key=key)
+        time_decrypt = time.perf_counter_ns()
 
-        # time_decrypt = time.perf_counter_ns()
-
-        # # Execution ID (request_count), time of start (to measure the time the data travels), elapsed signature verification, elapsed qkd key retrieval, elapsed decryption, elapsed request handling
-        # output = f"{request_count},{time_start},{(time_signature_verification - time_start) / NANO_TO_MILLI},{(time_qkd_key - time_signature_verification) / NANO_TO_MILLI},{(time_decrypt - time_qkd_key) / NANO_TO_MILLI},{(time_decrypt - time_start) / NANO_TO_MILLI}"
+        # Execution ID (request_count), elapsed signature verification, elapsed qkd key retrieval, elapsed decryption, elapsed request handling
+        output = f"{request_count},{(time_signature_verification - time_start) / NANO_TO_MILLI},{(time_qkd_key - time_signature_verification) / NANO_TO_MILLI},{(time_decrypt - time_qkd_key) / NANO_TO_MILLI},{(time_decrypt - time_start) / NANO_TO_MILLI}"
 
         with lock:
             global request_count
-            print(f"Request no. {request_count}, key ID: {payload['key_ID']}")
             request_count += 1
             
-            # outputs.append(output)
+            outputs.append(output)
 
-            # if (request_count > MAX_REQUESTS):
-            #     self.server.shutdown()
+            if (request_count > MAX_REQUESTS):
+                self.server.shutdown()
 
 
 def run():
@@ -153,9 +152,9 @@ def run():
         print("Shutting down...")
         server.server_close()
     
-    # with open("../out/output_clientB.txt", "w") as output:
-    #     for op in outputs:
-    #         output.write(op)
+    with open("../out/output_clientB.txt", "w") as output:
+        for op in outputs:
+            output.write(op)
 
 
 if __name__ == "__main__":
