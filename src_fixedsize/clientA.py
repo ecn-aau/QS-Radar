@@ -19,7 +19,7 @@ KEY_AMOUNT = 1
 TIMEOUT = 10
 SIGALG = "ML-DSA-87"
 EXECUTION_AMOUNT = 100000
-NANO_TO_MILLI = 100000
+NANO_TO_MILLI = 1000000
 
 
 def request_qkd_key() -> tuple[str, bytes]:
