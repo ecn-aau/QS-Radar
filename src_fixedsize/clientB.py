@@ -99,7 +99,6 @@ class CLIENTBHandler(BaseHTTPRequestHandler):
 
         try:
             data = json.loads(payload)
-            # print(f"Received JSON: {data}")
         except json.JSONDecodeError:
             self.send_response(400)
             self.end_headers()
