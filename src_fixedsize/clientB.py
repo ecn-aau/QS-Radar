@@ -3,6 +3,9 @@ import base64
 import oqs
 import json
 import time
+import logging
+
+from flask import Flask, request, jsonify
 
 from Crypto.Cipher import AES
 import threading
@@ -16,7 +19,7 @@ SIGALG = "ML-DSA-87"
 LISTENING_URL = "localhost"
 LISTENING_PORT = 8080
 NANO_TO_MILLI = 1000000
-MAX_REQUESTS = 100000
+MAX_REQUESTS = 10000
 
 lock = threading.Lock()
 outputs = []
@@ -90,73 +93,101 @@ def get_public_key() -> bytes:
     return base64.b64decode(public_key)
 
 
-class CLIENTBHandler(BaseHTTPRequestHandler):
-    def setup(self):
-        super().setup()
-        self.pub_key = get_public_key()
+# class CLIENTBHandler(BaseHTTPRequestHandler):
+#     def setup(self):
+#         super().setup()
+#         self.pub_key = get_public_key()
 
-    def do_POST(self) -> None:
-        content_length = int(self.headers.get('Content-Length', 0))
-        payload = self.rfile.read(content_length)
+#     def do_POST(self) -> None:
+#         content_length = int(self.headers.get('Content-Length', 0))
+#         payload = self.rfile.read(content_length)
 
-        try:
-            data = json.loads(payload)
-        except json.JSONDecodeError:
-            self.send_response(400)
-            self.end_headers()
-            self.wfile.write(b"Invalid JSON")
-            return
+#         try:
+#             data = json.loads(payload)
+#         except json.JSONDecodeError:
+#             self.send_response(400)
+#             self.end_headers()
+#             self.wfile.write(b"Invalid JSON")
+#             return
 
-        threading.Thread(target=self.handle_request, args=(data,), daemon=True).start()
+#         threading.Thread(target=self.handle_request, args=(data,), daemon=True).start()
 
-        self.send_response(200)
-        self.end_headers()
-        self.wfile.write(b"Ok")
+#         self.send_response(200)
+#         self.end_headers()
+#         self.wfile.write(b"Ok")
 
-    def log_message(self, format, *args):
-        # Disable default logging
+#     def log_message(self, format, *args):
+#         # Disable default logging
+#         return
+    
+pub_key = get_public_key()
+
+def handle_request(payload) -> None:
+    global request_count
+    time_start = time.perf_counter_ns()
+    signature_valid = verify_signature(payload=payload, public_key=pub_key)
+    time_signature_verification = time.perf_counter_ns()
+    if not signature_valid:
+        print('Invalid signature on payload! Tampering detected.')
         return
+
+    key = request_qkd_key_with_ID(key_id=payload["key_ID"])
+    time_qkd_key = time.perf_counter_ns()
+
+    data = decrypt_data(payload=payload, key=key)
+    time_decrypt = time.perf_counter_ns()
+
+    # Execution ID (request_count), elapsed signature verification, elapsed qkd key retrieval, elapsed decryption, elapsed request handling
+    output = f"{request_count},{(time_signature_verification - time_start) / NANO_TO_MILLI},{(time_qkd_key - time_signature_verification) / NANO_TO_MILLI},{(time_decrypt - time_qkd_key) / NANO_TO_MILLI},{(time_decrypt - time_start) / NANO_TO_MILLI}\n"
+
+    with lock:
+        request_count += 1
+        
+        outputs.append(output)
+
+        # if (request_count == MAX_REQUESTS):
+        #     request.environ.get('werkzeug.server.shutdown')
+
+
+# def run():
+#     server = HTTPServer((LISTENING_URL, LISTENING_PORT), CLIENTBHandler)
+#     print(f"Listening on http://{LISTENING_URL}:{LISTENING_PORT}")
+#     try:
+#         server.serve_forever()
+#     except KeyboardInterrupt:
+#         print("Shutting down...")
+#         server.server_close()
     
-    def handle_request(self, payload) -> None:
-        global request_count
-        time_start = time.perf_counter_ns()
-        signature_valid = verify_signature(payload=payload, public_key=self.pub_key)
-        time_signature_verification = time.perf_counter_ns()
-        if not signature_valid:
-            print('Invalid signature on payload! Tampering detected.')
-            return
-
-        key = request_qkd_key_with_ID(key_id=payload["key_ID"])
-        time_qkd_key = time.perf_counter_ns()
-
-        data = decrypt_data(payload=payload, key=key)
-        time_decrypt = time.perf_counter_ns()
-
-        # Execution ID (request_count), elapsed signature verification, elapsed qkd key retrieval, elapsed decryption, elapsed request handling
-        output = f"{request_count},{(time_signature_verification - time_start) / NANO_TO_MILLI},{(time_qkd_key - time_signature_verification) / NANO_TO_MILLI},{(time_decrypt - time_qkd_key) / NANO_TO_MILLI},{(time_decrypt - time_start) / NANO_TO_MILLI}\n"
-
-        with lock:
-            request_count += 1
-            
-            outputs.append(output)
-
-            if (request_count == MAX_REQUESTS):
-                self.server.shutdown()
+#     with open("../out/output_clientB.txt", "w") as output:
+#         for op in outputs:
+#             output.write(op)
 
 
-def run():
-    server = HTTPServer((LISTENING_URL, LISTENING_PORT), CLIENTBHandler)
-    print(f"Listening on http://{LISTENING_URL}:{LISTENING_PORT}")
+app = Flask(__name__)
+
+log = logging.getLogger('werkzeug')
+log.setLevel(logging.ERROR)
+
+@app.route('/', methods=['POST'])
+def handle_post():
+    payload = request.data
+    
     try:
-        server.serve_forever()
-    except KeyboardInterrupt:
-        print("Shutting down...")
-        server.server_close()
-    
+        payload = json.loads(payload)
+    except json.JSONDecodeError:
+        return jsonify({'error': 'Invalid JSON'}), 400
+
+    threading.Thread(target=handle_request, args=(payload,), daemon=True).start()
+    # handle_request(payload=payload)
+    return jsonify({'status': 'success'}), 200
+
+
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=8080)
     with open("../out/output_clientB.txt", "w") as output:
         for op in outputs:
             output.write(op)
 
 
-if __name__ == "__main__":
-    run()
+# if __name__ == "__main__":
+#     # run()
