@@ -140,7 +140,7 @@ class CLIENTBHandler(BaseHTTPRequestHandler):
             
             outputs.append(output)
 
-            if (request_count > MAX_REQUESTS):
+            if (request_count == MAX_REQUESTS):
                 self.server.shutdown()
 
 
