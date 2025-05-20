@@ -74,6 +74,7 @@ def verify_signature(payload: object, public_key: bytes) -> bool:
     signed_data = {
         "nonce": payload["nonce"],
         "ciphertext": payload["ciphertext"],
+
         "tag": payload["tag"],
         "key_ID": payload["key_ID"],
     }
@@ -90,7 +91,8 @@ def get_public_key() -> bytes:
 
 
 class CLIENTBHandler(BaseHTTPRequestHandler):
-    def __init__(self, paramters):
+    def setup(self):
+        super().setup()
         self.pub_key = get_public_key()
 
     def do_POST(self) -> None:
@@ -116,6 +118,7 @@ class CLIENTBHandler(BaseHTTPRequestHandler):
         return
     
     def handle_request(self, payload) -> None:
+        global request_count
         time_start = time.perf_counter_ns()
         signature_valid = verify_signature(payload=payload, public_key=self.pub_key)
         time_signature_verification = time.perf_counter_ns()
@@ -130,10 +133,9 @@ class CLIENTBHandler(BaseHTTPRequestHandler):
         time_decrypt = time.perf_counter_ns()
 
         # Execution ID (request_count), elapsed signature verification, elapsed qkd key retrieval, elapsed decryption, elapsed request handling
-        output = f"{request_count},{(time_signature_verification - time_start) / NANO_TO_MILLI},{(time_qkd_key - time_signature_verification) / NANO_TO_MILLI},{(time_decrypt - time_qkd_key) / NANO_TO_MILLI},{(time_decrypt - time_start) / NANO_TO_MILLI}"
+        output = f"{request_count},{(time_signature_verification - time_start) / NANO_TO_MILLI},{(time_qkd_key - time_signature_verification) / NANO_TO_MILLI},{(time_decrypt - time_qkd_key) / NANO_TO_MILLI},{(time_decrypt - time_start) / NANO_TO_MILLI}\n"
 
         with lock:
-            global request_count
             request_count += 1
             
             outputs.append(output)

@@ -120,7 +120,6 @@ if __name__ == "__main__":
         time_encryption = time.perf_counter_ns()
 
         payload = sign_data(encrypted_data=encrypted_data, key_id=key_ID, private_key=priv_key)
-        # print(payload)
         time_sign = time.perf_counter_ns()
 
         send_data(payload=payload)
