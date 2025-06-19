@@ -1,12 +1,12 @@
 import requests
 import base64
 import oqs
+import hashlib
 import json
-import time
+import socket
 
 from Crypto.Cipher import AES
-import threading
-from http.server import BaseHTTPRequestHandler, HTTPServer
+
 
 CLIENT_B_KMS_HOST = "192.168.3.128" # Address of KMS, maybe there is only one
 CLIENT_B_KMS_PORT = "8200"
@@ -17,10 +17,8 @@ LISTENING_URL = "localhost"
 LISTENING_PORT = 8080
 NANO_TO_MILLI = 100000
 MAX_REQUESTS = 100000
+UDP_LIMIT = 9216 # OS/hardware limit in bytes for max sendable UDP packet size. 9216 on macOS
 
-lock = threading.Lock()
-outputs = []
-request_count = 1 
 
 def request_qkd_key_with_ID(key_id: str) -> bytes:
     get_key_with_IDs_url = f"{CLIENT_B_KMS_BASE_URL}/keys/{CLIENT_A_ID}/dec_keys"
@@ -69,7 +67,7 @@ def decrypt_data(payload: object, key: bytes) -> bytes:
         print("Decryption failed or data tampered")
 
 
-def verify_signature(payload: object) -> bool:
+def verify_signature(payload: object, public_key: bytes) -> bool:
     signature = base64.b64decode(payload["signature"])
     signed_data = {
         "nonce": payload["nonce"],
@@ -78,81 +76,53 @@ def verify_signature(payload: object) -> bool:
         "key_ID": payload["key_ID"],
     }
     message = json.dumps(signed_data, sort_keys=True).encode()
-
-    with open("../keys/clientA_keys.json", "r") as file:
-        data = json.load(file)
-    public_key = data["public_key"]
-    public_key = base64.b64decode(public_key)
     
     with oqs.Signature(SIGALG) as verifier:
         return verifier.verify(message, signature, public_key)
 
+def send_data(payload: bytes) -> None:
+    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    UDP_IP = "127.0.0.1"
+    UDP_PORT = 56002
 
-class CLIENTBHandler(BaseHTTPRequestHandler):
-    def do_POST(self) -> None:
-        content_length = int(self.headers.get('Content-Length', 0))
-        payload = self.rfile.read(content_length)
+    hash = hashlib.sha256(payload).hexdigest()
 
-        try:
-            data = json.loads(payload)
-            # print(f"Received JSON: {data}")
-        except json.JSONDecodeError:
-            self.send_response(400)
-            self.end_headers()
-            self.wfile.write(b"Invalid JSON")
-            return
-
-        threading.Thread(target=self.handle_request, args=(data,), daemon=True).start()
-
-        self.send_response(200)
-        self.end_headers()
-        self.wfile.write(b"Ok")
-
-    def log_message(self, format, *args):
-        # Disable default logging
-        return
-    
-    def handle_request(self, payload) -> None:
-        # time_start = time.perf_counter_ns()
-        signature_valid = verify_signature(payload=payload)
-        # time_signature_verification = time.perf_counter_ns()
-        if not signature_valid:
-            print('Invalid signature on payload! Tampering detected.')
-            return
-
-        key = request_qkd_key_with_ID(key_id=payload["key_ID"])
-        # time_qkd_key = time.perf_counter_ns()
-        data = decrypt_data(payload=payload, key=key)
-
-        # time_decrypt = time.perf_counter_ns()
-
-        # # Execution ID (request_count), time of start (to measure the time the data travels), elapsed signature verification, elapsed qkd key retrieval, elapsed decryption, elapsed request handling
-        # output = f"{request_count},{time_start},{(time_signature_verification - time_start) / NANO_TO_MILLI},{(time_qkd_key - time_signature_verification) / NANO_TO_MILLI},{(time_decrypt - time_qkd_key) / NANO_TO_MILLI},{(time_decrypt - time_start) / NANO_TO_MILLI}"
-
-        with lock:
-            global request_count
-            print(f"Request no. {request_count}, key ID: {payload['key_ID']}")
-            request_count += 1
-            
-            # outputs.append(output)
-
-            # if (request_count > MAX_REQUESTS):
-            #     self.server.shutdown()
+    sock.sendto(payload, (UDP_IP, UDP_PORT))
+    print(f"Packet forwarded: SHA-256 {hash}")
 
 
-def run():
-    server = HTTPServer((LISTENING_URL, LISTENING_PORT), CLIENTBHandler)
-    print(f"Listening on http://{LISTENING_URL}:{LISTENING_PORT}")
-    try:
-        server.serve_forever()
-    except KeyboardInterrupt:
-        print("Shutting down...")
-        server.server_close()
-    
-    # with open("../out/output_clientB.txt", "w") as output:
-    #     for op in outputs:
-    #         output.write(op)
+def get_public_key() -> bytes:
+    with open("../keys/clientA_keys.json", "r") as file:
+        data = json.load(file)
+    public_key = data["public_key"]
+    return base64.b64decode(public_key)
 
 
 if __name__ == "__main__":
-    run()
+    pub_key = get_public_key()
+
+    UDP_IP = "127.0.0.1"
+    UDP_PORT = 56001
+
+    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    sock.bind((UDP_IP, UDP_PORT))
+    print(f"Listening for UDP packets on: {UDP_IP}:{UDP_PORT}")
+
+    while True:
+        data, addr = sock.recvfrom(UDP_LIMIT)
+        hash = hashlib.sha256(data).hexdigest()
+        print(f"Encrypted data received: SHA-256 {hash}")
+
+        try:
+            decoded_data = data.decode()
+            payload = json.loads(decoded_data)
+            if verify_signature(payload=payload, public_key=pub_key):
+                # If signature is good, we continue
+                key = request_qkd_key_with_ID(key_id=payload["key_ID"])
+                raw_data = decrypt_data(payload=payload, key=key)
+                send_data(payload=raw_data)
+            else:
+                # If signature is not good, we drop packet and log
+                print(f"Wrong signature, packet was dropped: SHA-256 {hash}")
+        except:
+            print(f"JSON EXCEPTION: {decoded_data}")
