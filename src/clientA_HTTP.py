@@ -3,9 +3,13 @@ import base64
 import hashlib
 import json
 import socket
+import logging
+import time
+import ops
 
 from Crypto.Cipher import AES
 
+from src.clientA import get_private_key
 
 CLIENT_A_KMS_HOST = "192.168.3.126" # Address of KMS, maybe there is only one
 CLIENT_A_KMS_PORT = "8200"
@@ -13,7 +17,9 @@ CLIENT_A_KMS_BASE_URL = f"https://{CLIENT_A_KMS_HOST}:{CLIENT_A_KMS_PORT}/api/v1
 CLIENT_B_ID = "Bob254250"
 KEY_LENGTH = 256  # In bits
 KEY_AMOUNT = 1
+SIGALG = "ML-DSA-87"
 
+logging.basicConfig(filename="logA.log", level=logging.INFO)
 
 def request_qkd_key() -> tuple[str, bytes]:
     get_key_url = f"{CLIENT_A_KMS_BASE_URL}/keys/{CLIENT_B_ID}/enc_keys"
@@ -39,13 +45,17 @@ def request_qkd_key() -> tuple[str, bytes]:
         return (key_ID, key)
 
     except requests.exceptions.HTTPError as http_err:
-        print(f'HTTP error occurred: {http_err} - Status Code: {response.status_code}')
+        print(f"HTTP error occurred: {http_err} - Status Code: {response.status_code}")
+        logging.ERROR(str(time.time())+f": HTTP error occurred: {http_err} - Status Code: {response.status_code}")
     except requests.exceptions.ConnectionError as conn_err:
-        print(f'Connection error occurred: {conn_err}')
+        print(f"Connection error occurred: {conn_err}")
+        logging.ERROR(str(time.time())+f": Connection error occurred: {conn_err}")
     except requests.exceptions.Timeout as timeout_err:
-        print(f'Timeout error occurred: {timeout_err}')
+        print(f"Timeout error occurred: {timeout_err}")
+        logging.ERROR(str(time.time())+f": Timeout error occurred: {timeout_err}")
     except requests.exceptions.RequestException as err:
         print(f"Request failed: {err}")
+        logging.ERROR(str(time.time())+f": Request failed: {err}")
 
 
 def encrypt_data(data: bytes, key: bytes) -> object:
@@ -66,15 +76,31 @@ def send_data(payload) -> None:
         response = requests.post(url="http://192.168.3.102:8080", json=payload, timeout=10)
         response.raise_for_status()
         print(f"Encrypted data forwarded: SHA-256 {hash}")
+        logging.INFO(str(time.time())+f": Encrypted data forwarded: SHA-256 {hash}")
     except requests.exceptions.HTTPError as http_err:
-        print(f'HTTP error occurred: {http_err} - Status Code: {response.status_code}')
+        print(f"HTTP error occurred: {http_err} - Status Code: {response.status_code}")
+        logging.ERROR(str(time.time())+f": HTTP error occurred: {http_err} - Status Code: {response.status_code}")
     except requests.exceptions.ConnectionError as conn_err:
-        print(f'Connection error occurred: {conn_err}')
+        print(f"Connection error occurred: {conn_err}")
+        logging.ERROR(str(time.time())+f": Connection error occurred: {conn_err}")
     except requests.exceptions.Timeout as timeout_err:
-        print(f'Timeout error occurred: {timeout_err}')
+        print(f"Timeout error occurred: {timeout_err}")
+        logging.ERROR(str(time.time())+f": Timeout error occurred: {timeout_err}")
     except requests.exceptions.RequestException as req_err:
-        print(f'Unexpected error: {req_err}')
-    
+        print(f"Unexpected error: {req_err}")
+        logging.ERROR(str(time.time())+f": Unexpected error: {req_err}")
+
+def get_private_key() -> bytes:
+    with open("../keys/ppk.json", "r") as file:
+        data = json.load(file)
+    private_key = data["private_key"]
+    return base64.b64decode(private_key)
+
+def sign_data(encrypted_data: object, private_key: bytes) -> object:
+    signer = oqs.Signature(SIGALG, private_key)
+    signature = signer.sign(json.dumps(encrypted_data, sort_keys=True).encode())
+    encrypted_data["signature"] = base64.b64encode(signature).decode()
+    return encrypted_data
 
 if __name__ == "__main__":
     UDP_IP = "127.0.0.1"
@@ -83,16 +109,20 @@ if __name__ == "__main__":
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     sock.bind((UDP_IP, UDP_PORT))
     print(f"Listening for UDP packets on: {UDP_IP}:{UDP_PORT}")
+    logging.INFO(str(time.time())+f": Listening for UDP packets on: {UDP_IP}:{UDP_PORT}")
 
     lost_keys = 0
+
+    pv_key = get_private_key()
 
     while True:
         data, addr = sock.recvfrom(65535)
         hash = hashlib.sha256(data).hexdigest()
         print(f"Raw packet received: SHA-256 {hash}")
+        logging.INFO(str(time.time())+f": Raw packet received: SHA-256 {hash}")
     
         key_ID, key = request_qkd_key()
         encrypted_data = encrypt_data(data=data, key=key)
         encrypted_data["key_ID"] = key_ID
-        payload = encrypted_data
+        payload = sign_data(encrypted_data=encrypted_data, private_key=pv_key)
         send_data(payload=payload)

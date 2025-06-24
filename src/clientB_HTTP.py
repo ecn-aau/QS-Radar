@@ -4,6 +4,8 @@ import hashlib
 import json
 import logging
 import socket
+import time
+import oqs
 
 from Crypto.Cipher import AES
 from flask import Flask, request, jsonify
@@ -13,7 +15,9 @@ CLIENT_B_KMS_HOST = "192.168.3.128" # Address of KMS, maybe there is only one
 CLIENT_B_KMS_PORT = "8200"
 CLIENT_B_KMS_BASE_URL = f"https://{CLIENT_B_KMS_HOST}:{CLIENT_B_KMS_PORT}/api/v1" # KMS cert might be self-signed?
 CLIENT_A_ID = "Alice254250"
+SIGALG = "ML-DSA-87"
 
+logging.basicConfig(filename="logB.log", level=logging.INFO)
 
 def request_qkd_key_with_ID(key_id: str) -> bytes:
     get_key_with_IDs_url = f"{CLIENT_B_KMS_BASE_URL}/keys/{CLIENT_A_ID}/dec_keys"
@@ -39,13 +43,17 @@ def request_qkd_key_with_ID(key_id: str) -> bytes:
         return base64.b64decode(key_info['Keys'][0]['key'])
 
     except requests.exceptions.HTTPError as http_err:
-        print(f'HTTP error occurred: {http_err} - Status Code: {response.status_code}')
+        print(f"HTTP error occurred: {http_err} - Status Code: {response.status_code}")
+        logging.ERROR(str(time.time())+f": HTTP error occurred: {http_err} - Status Code: {response.status_code}")
     except requests.exceptions.ConnectionError as conn_err:
-        print(f'Connection error occurred: {conn_err}')
+        print(f"Connection error occurred: {conn_err}")
+        logging.ERROR(str(time.time())+f": Connection error occurred: {conn_err}")
     except requests.exceptions.Timeout as timeout_err:
-        print(f'Timeout error occurred: {timeout_err}')
+        print(f"Timeout error occurred: {timeout_err}")
+        logging.ERROR(str(time.time())+f": Timeout error occurred: {timeout_err}")
     except requests.exceptions.RequestException as err:
         print(f"Request failed: {err}")
+        logging.ERROR(str(time.time())+f": Request failed: {err}")
 
 
 def decrypt_data(payload: object, key: bytes) -> bytes:
@@ -60,6 +68,7 @@ def decrypt_data(payload: object, key: bytes) -> bytes:
 
     except ValueError:
         print("Decryption failed or data tampered")
+        logging.ERROR(str(time.time())+": Decryption failed or data tampered")
 
 
 def send_data(payload: bytes) -> None:
@@ -71,12 +80,29 @@ def send_data(payload: bytes) -> None:
 
     sock.sendto(payload, (UDP_IP, UDP_PORT))
     print(f"Packet forwarded: SHA-256 {hash}")
+    logging.INFO(str(time.time())+f": Packet forwarded: SHA-256 {hash}")
 
+
+def verify_signature(payload: object, public_key: bytes) -> bool:
+    signature = base64.b64decode(payload["signature"])
+    signed_data = {
+        "nonce": payload["nonce"],
+        "ciphertext": payload["ciphertext"],
+        "tag": payload["tag"],
+        "key_ID": payload["key_ID"],
+    }
+    message = json.dumps(signed_data, sort_keys=True).encode()
+
+    with oqs.Signature(SIGALG) as verifier:
+        return verifier.verify(message, signature, public_key)
+
+def get_public_key() -> bytes:
+    with open("../keys/ppk.json", "r") as file:
+        data = json.load(file)
+    public_key = data["public_key"]
+    return base64.b64decode(public_key)
 
 app = Flask(__name__)
-
-log = logging.getLogger('werkzeug')
-log.setLevel(logging.ERROR)
 
 @app.route('/', methods=['POST'])
 def handle_post():
@@ -85,14 +111,21 @@ def handle_post():
     try:
         payload = json.loads(payload)    
     except json.JSONDecodeError:
+        logging.ERROR(str(time.time())+": Invalid JSON")
         return jsonify({'error': 'Invalid JSON'}), 400
 
     hash = hashlib.sha256(request.data).hexdigest()
     print(f"Encrypted data received: SHA-256 {hash}")
-    key = request_qkd_key_with_ID(key_id=payload["key_ID"])
-    raw_data = decrypt_data(payload=payload, key=key)
-    send_data(payload=raw_data)
-    
+    logging.INFO(f": Encrypted data received: SHA-256 {hash}")
+
+    if verify_signature(payload, get_public_key()):
+        key = request_qkd_key_with_ID(key_id=payload["key_ID"])
+        raw_data = decrypt_data(payload=payload, key=key)
+        send_data(payload=raw_data)
+    else:
+        logging.ERROR(str(time.time())+": Invalid signature")
+        return jsonify({'error': 'Invalid signature'}), 400
+
     return jsonify({'status': 'success'}), 200
 
 
