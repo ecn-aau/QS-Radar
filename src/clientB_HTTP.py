@@ -4,7 +4,6 @@ import hashlib
 import json
 import logging
 import socket
-import time
 import oqs
 
 from Crypto.Cipher import AES
@@ -17,7 +16,12 @@ CLIENT_B_KMS_BASE_URL = f"https://{CLIENT_B_KMS_HOST}:{CLIENT_B_KMS_PORT}/api/v1
 CLIENT_A_ID = "Alice254250"
 SIGALG = "ML-DSA-87"
 
-logging.basicConfig(filename="logB.log", level=logging.INFO)
+logging.basicConfig(
+    filename="logB.log",
+    format="%(asctime)s.%(msecs)03d::%(levelname)s::%(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S",
+    level=logging.INFO,
+    filemode="w")
 
 def request_qkd_key_with_ID(key_id: str) -> bytes:
     get_key_with_IDs_url = f"{CLIENT_B_KMS_BASE_URL}/keys/{CLIENT_A_ID}/dec_keys"
@@ -44,16 +48,16 @@ def request_qkd_key_with_ID(key_id: str) -> bytes:
 
     except requests.exceptions.HTTPError as http_err:
         print(f"HTTP error occurred: {http_err} - Status Code: {response.status_code}")
-        logging.ERROR(str(time.time())+f": HTTP error occurred: {http_err} - Status Code: {response.status_code}")
+        logging.error(f"HTTP error occurred: {http_err} - Status Code: {response.status_code}")
     except requests.exceptions.ConnectionError as conn_err:
         print(f"Connection error occurred: {conn_err}")
-        logging.ERROR(str(time.time())+f": Connection error occurred: {conn_err}")
+        logging.error(f"Connection error occurred: {conn_err}")
     except requests.exceptions.Timeout as timeout_err:
         print(f"Timeout error occurred: {timeout_err}")
-        logging.ERROR(str(time.time())+f": Timeout error occurred: {timeout_err}")
+        logging.error(f"Timeout error occurred: {timeout_err}")
     except requests.exceptions.RequestException as err:
         print(f"Request failed: {err}")
-        logging.ERROR(str(time.time())+f": Request failed: {err}")
+        logging.error(f"Request failed: {err}")
 
 
 def decrypt_data(payload: object, key: bytes) -> bytes:
@@ -68,7 +72,7 @@ def decrypt_data(payload: object, key: bytes) -> bytes:
 
     except ValueError:
         print("Decryption failed or data tampered")
-        logging.ERROR(str(time.time())+": Decryption failed or data tampered")
+        logging.error("Decryption failed or data tampered")
 
 
 def send_data(payload: bytes) -> None:
@@ -80,7 +84,7 @@ def send_data(payload: bytes) -> None:
 
     sock.sendto(payload, (UDP_IP, UDP_PORT))
     print(f"Packet forwarded: SHA-256 {hash}")
-    logging.INFO(str(time.time())+f": Packet forwarded: SHA-256 {hash}")
+    logging.info(f"Packet forwarded: SHA-256 {hash}")
 
 
 def verify_signature(payload: object, public_key: bytes) -> bool:
@@ -111,19 +115,19 @@ def handle_post():
     try:
         payload = json.loads(payload)    
     except json.JSONDecodeError:
-        logging.ERROR(str(time.time())+": Invalid JSON")
+        logging.error("Invalid JSON")
         return jsonify({'error': 'Invalid JSON'}), 400
 
     hash = hashlib.sha256(request.data).hexdigest()
     print(f"Encrypted data received: SHA-256 {hash}")
-    logging.INFO(f": Encrypted data received: SHA-256 {hash}")
+    logging.info(f"Encrypted data received: SHA-256 {hash}")
 
     if verify_signature(payload, get_public_key()):
         key = request_qkd_key_with_ID(key_id=payload["key_ID"])
         raw_data = decrypt_data(payload=payload, key=key)
         send_data(payload=raw_data)
     else:
-        logging.ERROR(str(time.time())+": Invalid signature")
+        logging.error("Invalid signature")
         return jsonify({'error': 'Invalid signature'}), 400
 
     return jsonify({'status': 'success'}), 200
