@@ -21,7 +21,7 @@ logging.basicConfig(
     format="%(asctime)s.%(msecs)03d::%(levelname)s::%(message)s",
     datefmt="%Y-%m-%d %H:%M:%S",
     level=logging.INFO,
-    filemode="w")
+    filemode="x")
 
 def request_qkd_key_with_ID(key_id: str) -> bytes:
     get_key_with_IDs_url = f"{CLIENT_B_KMS_BASE_URL}/keys/{CLIENT_A_ID}/dec_keys"
@@ -64,7 +64,7 @@ def decrypt_data(payload: object, key: bytes) -> bytes:
     nonce = base64.b64decode(payload["nonce"])
     tag = base64.b64decode(payload["tag"])
     ciphertext = base64.b64decode(payload["ciphertext"])
-    
+
     try:
         cipher = AES.new(key, AES.MODE_GCM, nonce=nonce)
         message = cipher.decrypt_and_verify(ciphertext, tag)
@@ -83,8 +83,6 @@ def send_data(payload: bytes) -> None:
     hash = hashlib.sha256(payload).hexdigest()
 
     sock.sendto(payload, (UDP_IP, UDP_PORT))
-    print(f"Packet forwarded: SHA-256 {hash}")
-    logging.info(f"Packet forwarded: SHA-256 {hash}")
 
 
 def verify_signature(payload: object, public_key: bytes) -> bool:
@@ -101,7 +99,7 @@ def verify_signature(payload: object, public_key: bytes) -> bool:
         return verifier.verify(message, signature, public_key)
 
 def get_public_key() -> bytes:
-    with open("../keys/ppk.json", "r") as file:
+    with open("../keys/ppk-"+SIGALG+".json", "r") as file:
         data = json.load(file)
     public_key = data["public_key"]
     return base64.b64decode(public_key)
@@ -119,15 +117,23 @@ def handle_post():
         return jsonify({'error': 'Invalid JSON'}), 400
 
     hash = hashlib.sha256(request.data).hexdigest()
-    print(f"Encrypted data received: SHA-256 {hash}")
-    logging.info(f"Encrypted data received: SHA-256 {hash}")
+    print(f"Encrypted and signed payload received: SHA-256 {hash}")
+    logging.info(f"Encrypted and signed payload received: SHA-256 {hash}")
 
     if verify_signature(payload, get_public_key()):
-        key = request_qkd_key_with_ID(key_id=payload["key_ID"])
+        logging.debug(f"Verified signature: {SIGALG}")
+
+        key = request_qkd_key_with_ID(key_id=payload['key_ID'])
+        logging.debug(f"QKD key collected: ID {payload['key_ID']}")
+
         raw_data = decrypt_data(payload=payload, key=key)
+        logging.debug(f"Decrypted data with key: ID {payload['key_ID']}")
+
         send_data(payload=raw_data)
+        print(f"Raw packet forwarded: SHA-256 {hash}")
+        logging.info(f"Raw packet forwarded: SHA-256 {hash}")
     else:
-        logging.error("Invalid signature")
+        logging.error(f"Invalid signature: {SIGALG}")
         return jsonify({'error': 'Invalid signature'}), 400
 
     return jsonify({'status': 'success'}), 200
