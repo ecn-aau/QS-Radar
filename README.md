@@ -37,7 +37,7 @@ The scripts use `Python 3.13` in an environment with the following dependencies 
 certifi==2025.1.31
 charset-normalizer==3.4.1
 idna==3.10
-liboqs-python @ file:///mnt/d/git/liboqs-python
+liboqs-python
 pycryptodome==3.22.0
 requests==2.32.3
 urllib3==2.4.0
