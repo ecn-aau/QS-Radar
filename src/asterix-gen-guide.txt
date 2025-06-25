@@ -1,0 +1,13 @@
+To send:
+ast-tool-py --empty-selection --cat 62 1.20 random --sleep 2 | ast-tool-py to-udp --unicast "*" DESTINATION_IP DESTINATION_PORT
+
+By default:
+ast-tool-py --empty-selection --cat 62 1.20 random --sleep 2 | ast-tool-py to-udp --unicast "*" 127.0.0.1 56000
+
+---------------------------------------------------------------------------------------------------------------------------------
+
+To receive:
+ast-tool-py from-udp --unicast "ch1" LISTENING_IP LISTENING_PORT | ast-tool-py decode
+
+By default:
+ast-tool-py from-udp --unicast "ch1" 127.0.0.1 56002 | ast-tool-py decode

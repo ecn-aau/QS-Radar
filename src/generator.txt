@@ -1,8 +1,0 @@
-To send:
-ast-tool-py --empty-selection --cat 62 1.20 random --sleep 2 | ast-tool-py to-udp --unicast "*" DESTINATION_IP DESTINATION_PORT
-
-To receive:
-ast-tool-py from-udp --unicast "ch1" 127.0.0.1 LISTENING_PORT | ast-tool-py decode
-
-WSL proxy for HTTP:
-netsh interface portproxy add v4tov4 listenaddress=0.0.0.0 listenport=8080 connectaddress=172.22.126.227 connectport=8080
