@@ -4,7 +4,7 @@ ca-cert.crt
 *keys.json
 output*
 # out/*
-# keys/*
+keys/*
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
