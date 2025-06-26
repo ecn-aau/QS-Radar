@@ -16,11 +16,14 @@ CLIENT_B_KMS_BASE_URL = f"https://{CLIENT_B_KMS_HOST}:{CLIENT_B_KMS_PORT}/api/v1
 CLIENT_A_ID = "Alice254250"
 SIGALG = "ML-DSA-87"
 
+# Metrics
+rx_count = 0
+
 logging.basicConfig(
     filename="logB.log",
     format="%(asctime)s.%(msecs)03d::%(levelname)s::%(message)s",
     datefmt="%Y-%m-%d %H:%M:%S",
-    level=logging.INFO,
+    level=logging.ERROR,
     filemode="x")
 
 def request_qkd_key_with_ID(key_id: str) -> bytes:
@@ -138,6 +141,6 @@ def handle_post():
 
     return jsonify({'status': 'success'}), 200
 
-
 if __name__ == '__main__':
+    logging.info(f"Starting QS-Radar-C2: Signature {SIGALG} + QKD")
     app.run(host='0.0.0.0', port=8080)

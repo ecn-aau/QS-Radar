@@ -20,7 +20,7 @@ logging.basicConfig(
     filename="logA.log",
     format="%(asctime)s.%(msecs)03d::%(levelname)s::%(message)s",
     datefmt="%Y-%m-%d %H:%M:%S",
-    level=logging.INFO,
+    level=logging.ERROR,
     filemode="x")
 
 def request_qkd_key() -> tuple[str, bytes]:
@@ -105,20 +105,24 @@ def sign_data(encrypted_data: object, private_key: bytes) -> object:
 if __name__ == "__main__":
     logging.info(f"Starting QS-Radar: Signature {SIGALG} + QKD")
 
+    # Launch parameters
     UDP_IP = "127.0.0.1"
     UDP_PORT = 56000
+    max_tx = 10 ** 6
 
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     sock.bind((UDP_IP, UDP_PORT))
     print(f"Listening for UDP packets on: {UDP_IP}:{UDP_PORT}")
     logging.info(f"Listening for UDP packets on: {UDP_IP}:{UDP_PORT}")
 
-    lost_keys = 0
-
     pv_key = get_private_key()
     logging.debug("Private key loaded successfully")
 
-    while True:
+    tx_count = 0
+    while tx_count < max_tx:
+        tx_count += 1
+        logging.info(f"TX count: {tx_count}")
+
         data, addr = sock.recvfrom(65535)
 
         hash = hashlib.sha256(data).hexdigest()
@@ -138,3 +142,5 @@ if __name__ == "__main__":
         send_data(payload=payload)
         print(f"Encrypted and signed payload forwarded: SHA-256 {hash}")
         logging.info(f"Encrypted and signed payload forwarded: SHA-256 {hash}")
+
+    logging.info(f"Ending QS-Radar: Signature {SIGALG} + QKD")
