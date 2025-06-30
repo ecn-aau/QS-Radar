@@ -1,10 +1,7 @@
 import os
 import re
-from typing import List, Dict, Optional
+from typing import Union, List, Dict, Optional
 from datetime import datetime
-
-import pandas as pd
-import matplotlib.pyplot as plt
 
 
 # Function to read and return lines from the log file
@@ -18,17 +15,20 @@ def read_log_file(file_path):
 
     return lines
 
-def extract_logs_by_level(log_lines: List[str], level: str) -> List[dict]:
+def extract_logs_by_level(log_lines: List[str], levels: Union[str, List[str]]) -> List[dict]:
     """
     Extract log entries of a specific logging level from a list of log lines.
 
     Args:
         log_lines (List[str]): The list of log lines to parse.
-        level (str): The log level to filter by (e.g., 'INFO', 'ERROR').
+        levels (List[str]): The log levels to filter by (e.g., 'INFO', 'ERROR').
 
     Returns:
         List[dict]: A list of dictionaries with 'timestamp', 'level', and 'message'.
     """
+    if isinstance(levels, str):
+        levels = [levels]
+    levels = [lvl.upper() for lvl in levels]
     filtered_logs = []
 
     for line in log_lines:
@@ -36,11 +36,12 @@ def extract_logs_by_level(log_lines: List[str], level: str) -> List[dict]:
         parts = line.split("::", 2)  # Split into exactly 3 parts
 
         if len(parts) != 3:
-            raise KeyboardInterrupt("Invalid log line detected!")
+            print("Invalid log line detected - Ignoring.")
+            continue
 
         timestamp, log_level, message = parts
 
-        if log_level == level.upper():
+        if log_level.upper() in levels:
             filtered_logs.append({
                 "timestamp": timestamp,
                 "level": log_level,
@@ -48,6 +49,9 @@ def extract_logs_by_level(log_lines: List[str], level: str) -> List[dict]:
             })
 
     return filtered_logs
+
+def sorted_log_combine(logs1: List[Dict[str, str]], logs2: List[Dict[str, str]]) -> List[dict[str, str]]:
+    return sorted(logs1 + logs2, key=lambda log: log["timestamp"])
 
 def log_contains_pattern(message: str, pattern: str, use_regex: bool = False) -> bool:
     """
@@ -66,12 +70,12 @@ def log_contains_pattern(message: str, pattern: str, use_regex: bool = False) ->
     else:
         return pattern in message
 
-def mean_elapsed_time_between_patterns(
+def elapsed_time_between_patterns(
     logs: List[Dict[str, str]],
     start_pattern: str,
     end_pattern: str,
     use_regex: bool = False
-) -> Optional[float]:
+) -> Optional[list]:
     """
     Calculate the mean elapsed time in milliseconds between logs matching two patterns.
 
@@ -107,40 +111,4 @@ def mean_elapsed_time_between_patterns(
     if not time_deltas:
         return None
 
-    return sum(time_deltas) / len(time_deltas)
-
-# Example usage
-if __name__ == "__main__":
-    # Path to your log file
-    logA_file_path = "../data/20km/ML-DSA-87/logA.log"
-    logB_file_path = "../data/20km/ML-DSA-87/logB.log"
-
-    # Read the log file
-    logA_lines = read_log_file(logA_file_path)
-    logB_lines = read_log_file(logB_file_path)
-
-    # Show a preview of the first 5 lines
-    # print("First 5 lines from the log file:")
-    # for line in logA_lines[:5]:
-    #     print(line.strip())
-    # for line in logB_lines[:5]:
-    #     print(line.strip())
-
-    # Extract only INFO-level logs
-    info_logs = extract_logs_by_level(logA_lines, "INFO")
-    # print(f"\nFound {len(info_logs)} INFO logs:")
-    # for log in info_logs[:5]:
-    #     if log_contains_pattern(log["message"], "TX count"):
-    #         print(log)
-
-    avg_time = mean_elapsed_time_between_patterns(
-        logs=info_logs,  # list of parsed logs
-        start_pattern="Raw packet received",
-        end_pattern="Encrypted and signed payload forwarded",
-        use_regex=False
-    )
-
-    if avg_time is not None:
-        print(f"Average time between events: {avg_time:.2f} ms")
-    else:
-        print("No valid start-end pairs found.")
+    return time_deltas
