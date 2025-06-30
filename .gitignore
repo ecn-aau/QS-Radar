@@ -5,6 +5,7 @@ ca-cert.crt
 output*
 # out/*
 keys/*
+util/*.pdf
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
