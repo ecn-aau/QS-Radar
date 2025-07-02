@@ -11,28 +11,23 @@ if __name__ == "__main__":
     logA_lines = read_log_file(logA_file_path)
     logB_lines = read_log_file(logB_file_path)
 
-    # Show a preview of the first 5 lines
-    # print("First 5 lines from the log file:")
-    # for line in logA_lines[:5]:
-    #     print(line.strip())
-    # for line in logB_lines[:5]:
-    #     print(line.strip())
+    # Extract only the ERROR-level logs
+    error_logsA = extract_logs_by_level(logA_lines, "Error")
+    error_logsB = extract_logs_by_level(logB_lines, "Error")
+
+    # Check for error in the data
+    if(error_logsA != None or error_logsB != None):
+        print(f" Found {len(error_logsA)} error logs in TX")
+        print(f" Found {len(error_logsB)} error logs in RX")
+        raise KeyboardInterrupt(f"Terminating test")
 
     # Extract only INFO-level logs
     info_logsA = extract_logs_by_level(logA_lines, "INFO")
     info_logsB = extract_logs_by_level(logB_lines, "INFO")
-    # print(f"\nFound {len(info_logsA)} INFO logs:")
-    # for log in info_logsA[:5]:
-    #     if log_contains_pattern(log["message"], "TX count"):
-    #         print(log)
 
     # Extract only DEBUG-level logs
     debug_logsA = extract_logs_by_level(logA_lines, "DEBUG")
     debug_logsB = extract_logs_by_level(logB_lines, "DEBUG")
-    # print(f"\nFound {len(debug_logsA)} INFO logs:")
-    # for log in debug_logsA[:5]:
-    #     if log_contains_pattern(log["message"], "TX count"):
-    #         print(log)
 
     # Combine logs
     full_logsB = sorted_log_combine(info_logsB, debug_logsB)
