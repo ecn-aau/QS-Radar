@@ -11,48 +11,53 @@ if __name__ == "__main__":
     logA_lines = read_log_file(logA_file_path)
     logB_lines = read_log_file(logB_file_path)
 
-    # Extract only the ERROR-level logs
-    error_logsA = extract_logs_by_level(logA_lines, "Error")
-    error_logsB = extract_logs_by_level(logB_lines, "Error")
+    # Extract full logs
+    full_logsA = extract_logs_by_level(logA_lines, ["INFO", "DEBUG", "ERROR"])
+    full_logsB = extract_logs_by_level(logB_lines, ["INFO", "DEBUG", "ERROR"])
+
+    # Parse known errors
+    parsed_logsA, num_errors_A = remove_error_blocks_between_patterns(
+        full_logsA,
+        "Raw packet received",
+        "Encrypted and signed payload forwarded",
+        pattern_match_fn=log_contains_pattern,
+        inclusive=True,
+        error_filter_pattern="HTTP error occurred: 500 Server Error: INTERNAL SERVER ERROR for url: http://192.168.3.102:8080/")
+    print(f"Parsed {num_errors_A} errors in TX")
+    parsed_logsB, num_errors_B = remove_error_blocks_between_patterns(
+        full_logsB,
+        "Encrypted and signed payload received",
+        "Raw packet forwarded",
+        pattern_match_fn=log_contains_pattern,
+        inclusive=True,
+        error_filter_pattern="HTTP error occurred: 404 Client Error: Not Found for url: https://192.168.3.128:8200/")
+    print(f"Parsed {num_errors_B} errors in RX")
 
     # Check for error in the data
-    if(error_logsA != None or error_logsB != None):
-        print(f" Found {len(error_logsA)} error logs in TX")
-        print(f" Found {len(error_logsB)} error logs in RX")
-        raise KeyboardInterrupt(f"Terminating test")
-
-    # Extract only INFO-level logs
-    info_logsA = extract_logs_by_level(logA_lines, "INFO")
-    info_logsB = extract_logs_by_level(logB_lines, "INFO")
-
-    # Extract only DEBUG-level logs
-    debug_logsA = extract_logs_by_level(logA_lines, "DEBUG")
-    debug_logsB = extract_logs_by_level(logB_lines, "DEBUG")
-
-    # Combine logs
-    full_logsB = sorted_log_combine(info_logsB, debug_logsB)
+    if(contains_error_log(parsed_logsA) or contains_error_log(parsed_logsB)):
+        raise KeyboardInterrupt(f"Terminating test do to unexpected errors")
 
     # Collect time deltas between specific logs on TX
     dtimes_tx_A = elapsed_time_between_patterns(
-        logs=info_logsA,  # list of parsed logs
+        logs=parsed_logsA,  # list of parsed logs
         start_pattern="Raw packet received",
         end_pattern="Encrypted and signed payload forwarded",
         use_regex=False
     )
     dtimes_QKD_key_A = elapsed_time_between_patterns(
-        logs=debug_logsA,  # list of parsed logs
+        logs=parsed_logsA,  # list of parsed logs
         start_pattern="Starting new HTTPS connection (1): 192.168.3.126",
         end_pattern="QKD key collected",
         use_regex=False
     )
     dtimes_encrypt_A = elapsed_time_between_patterns(
-        logs=debug_logsA,  # list of parsed logs
+        logs=parsed_logsA,  # list of parsed logs
         start_pattern="QKD key collected",
         end_pattern="Encrypted data with key",
         use_regex=False
     )
     dtimes_sign_A = elapsed_time_between_patterns(
-        logs=debug_logsA,  # list of parsed logs
+        logs=parsed_logsA,  # list of parsed logs
         start_pattern="Encrypted data with key",
         end_pattern="Signed data with private key",
         use_regex=False
@@ -60,25 +65,25 @@ if __name__ == "__main__":
 
     # Collect time deltas between specific logs on RX
     dtimes_rx_B = elapsed_time_between_patterns(
-        logs=info_logsB,  # list of parsed logs
+        logs=parsed_logsB,  # list of parsed logs
         start_pattern="Encrypted and signed payload received",
         end_pattern="Raw packet forwarded",
         use_regex=False
     )
     dtimes_QKD_key_B = elapsed_time_between_patterns(
-        logs=debug_logsB,  # list of parsed logs
+        logs=parsed_logsB,  # list of parsed logs
         start_pattern="Starting new HTTPS connection (1): 192.168.3.128",
         end_pattern="QKD key collected",
         use_regex=False
     )
     dtimes_encrypt_B = elapsed_time_between_patterns(
-        logs=debug_logsB,  # list of parsed logs
+        logs=parsed_logsB,  # list of parsed logs
         start_pattern="QKD key collected",
         end_pattern="Decrypted data with key",
         use_regex=False
     )
     dtimes_sign_B = elapsed_time_between_patterns(
-        logs=full_logsB,  # list of parsed logs
+        logs=parsed_logsB,  # list of parsed logs
         start_pattern="Encrypted and signed payload received",
         end_pattern="Verified signature",
         use_regex=False
