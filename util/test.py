@@ -1,6 +1,9 @@
+import statistics
+
 from dataParser import *
 from dataPlotter import *
 
+import numpy as np
 
 if __name__ == "__main__":
     # Path to your log file
@@ -90,54 +93,82 @@ if __name__ == "__main__":
     )
 
     # Calculated TX metrics
-    avg_time_tx_A = sum(dtimes_tx_A) / len(dtimes_tx_A)
-    avg_time_QKD_key_A = sum(dtimes_QKD_key_A) / len(dtimes_QKD_key_A)
-    avg_time_encrypt_A = sum(dtimes_encrypt_A) / len(dtimes_encrypt_A)
-    avg_time_sign_A = sum(dtimes_sign_A) / len(dtimes_sign_A)
+    # - Mean
+    avg_time_tx_A = np.mean(dtimes_tx_A)
+    avg_time_QKD_key_A = np.mean(dtimes_QKD_key_A)
+    avg_time_encrypt_A = np.mean(dtimes_encrypt_A)
+    avg_time_sign_A = np.mean(dtimes_sign_A)
+    # - Standard deviation
+    std_time_tx_A = np.std(dtimes_tx_A)
+    std_time_QKD_key_A = np.std(dtimes_QKD_key_A)
+    std_time_encrypt_A = np.std(dtimes_encrypt_A)
+    std_time_sign_A = np.std(dtimes_sign_A)
 
     # Calculate RX metrics
-    avg_time_rx_B = sum(dtimes_rx_B) / len(dtimes_rx_B)
-    avg_time_QKD_key_B = sum(dtimes_QKD_key_B) / len(dtimes_QKD_key_B)
-    avg_time_encrypt_B = sum(dtimes_encrypt_B) / len(dtimes_encrypt_B)
-    avg_time_sign_B = sum(dtimes_sign_B) / len(dtimes_sign_B)
+    # - Mean
+    avg_time_rx_B = np.mean(dtimes_rx_B)
+    avg_time_QKD_key_B = np.mean(dtimes_QKD_key_B)
+    avg_time_encrypt_B = np.mean(dtimes_encrypt_B)
+    avg_time_sign_B = np.mean(dtimes_sign_B)
+    # - Standard deviation
+    std_time_rx_B = np.std(dtimes_rx_B)
+    std_time_QKD_key_B = np.std(dtimes_QKD_key_B)
+    std_time_encrypt_B = np.std(dtimes_encrypt_B)
+    std_time_sign_B = np.std(dtimes_sign_B)
 
     # Print TX metrics
     print("TX average latencies:")
-    if avg_time_tx_A is not None:
-        print(f"- Full payload processing: {avg_time_tx_A:.2f} ms")
-    else:
+    if avg_time_tx_A is None:
         print("- Full payload processing: No valid start-end pairs found.")
-    if avg_time_QKD_key_A is not None:
-        print(f"- QKD key collection: {avg_time_QKD_key_A:.2f} ms")
     else:
+        print("- Full payload processing:")
+        print(f"-- Mean: {avg_time_tx_A:.2f} ms")
+        print(f"-- Standard deviation: {std_time_tx_A:.2f} ms")
+    if avg_time_QKD_key_A is None:
         print("- QKD key collection: No valid start-end pairs found.")
-    if avg_time_encrypt_A is not None:
-        print(f"- Encryption: {avg_time_encrypt_A:.2f} ms")
     else:
+        print("- QKD key collection:")
+        print(f"-- Mean: {avg_time_QKD_key_A:.2f} ms")
+        print(f"-- Standard deviation: {std_time_QKD_key_A:.2f} ms")
+    if avg_time_encrypt_A is None:
         print("- Encryption: No valid start-end pairs found.")
-    if avg_time_sign_A is not None:
-        print(f"- Signature: {avg_time_sign_A:.2f} ms")
     else:
+        print("- Encryption:")
+        print(f"-- Mean: {avg_time_encrypt_A:.2f} ms")
+        print(f"-- Standard deviation: {std_time_encrypt_A:.2f} ms")
+    if avg_time_sign_A is None:
         print("- Signature: No valid start-end pairs found.")
+    else:
+        print("- Signature:")
+        print(f"-- Mean: {avg_time_sign_A:.2f} ms")
+        print(f"-- Standard deviation: {std_time_sign_A:.2f} ms")
 
     # Print RX metrics
     print("RX average latencies:")
-    if avg_time_rx_B is not None:
-        print(f"- Full payload processing: {avg_time_rx_B:.2f} ms")
-    else:
+    if avg_time_rx_B is None:
         print("- Full payload processing: No valid start-end pairs found.")
-    if avg_time_QKD_key_B is not None:
-        print(f"- QKD key collection: {avg_time_QKD_key_B:.2f} ms")
     else:
+        print("- Full payload processing:")
+        print(f"-- Mean: {avg_time_rx_B:.2f} ms")
+        print(f"-- Standard deviation: {std_time_rx_B:.2f} ms")
+    if avg_time_QKD_key_B is None:
         print("- QKD key collection: No valid start-end pairs found.")
-    if avg_time_encrypt_B is not None:
-        print(f"- Encryption: {avg_time_encrypt_B:.2f} ms")
     else:
+        print("- QKD key collection:")
+        print(f"-- Mean: {avg_time_QKD_key_B:.2f} ms")
+        print(f"-- Standard deviation: {std_time_QKD_key_B:.2f} ms")
+    if avg_time_encrypt_B is None:
         print("- Encryption: No valid start-end pairs found.")
-    if avg_time_sign_B is not None:
-        print(f"- Signature: {avg_time_sign_B:.2f} ms")
     else:
+        print("- Encryption:")
+        print(f"-- Mean: {avg_time_encrypt_B:.2f} ms")
+        print(f"-- Standard deviation: {std_time_encrypt_B:.2f} ms")
+    if avg_time_sign_B is None:
         print("- Signature: No valid start-end pairs found.")
+    else:
+        print("- Signature:")
+        print(f"-- Mean: {avg_time_sign_B:.2f} ms")
+        print(f"-- Standard deviation: {std_time_sign_B:.2f} ms")
 
     # Plot a histogram for the time deltas
     plot_time_deltas_bar(
