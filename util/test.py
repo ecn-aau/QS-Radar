@@ -147,4 +147,54 @@ if __name__ == "__main__":
         xlim_max=300,
         show_overflow_bins=True,
         output_pdf_path="TX_payload_processing_latency.pdf")
+    plot_time_deltas_bar(
+        dtimes_QKD_key_A,
+        bin_size=10,
+        title="TX key exchange latency",
+        xlim_max=300,
+        show_overflow_bins=True,
+        output_pdf_path="TX_key_exchange_latency.pdf")
+    plot_time_deltas_bar(
+        dtimes_encrypt_A,
+        bin_size=10,
+        title="TX encryption latency",
+        xlim_max=300,
+        show_overflow_bins=True,
+        output_pdf_path="TX_encryption_latency.pdf")
+    plot_time_deltas_bar(
+        dtimes_sign_A,
+        bin_size=10,
+        title="TX digital signature latency",
+        xlim_max=300,
+        show_overflow_bins=True,
+        output_pdf_path="TX_signature_latency.pdf")
+
+    plot_time_deltas_bar(
+        dtimes_rx_B,
+        bin_size=10,
+        title="RX payload processing latency",
+        xlim_max=300,
+        show_overflow_bins=True,
+        output_pdf_path="RX_payload_processing_latency.pdf")
+    plot_time_deltas_bar(
+        dtimes_QKD_key_B,
+        bin_size=10,
+        title="RX key exchange latency",
+        xlim_max=300,
+        show_overflow_bins=True,
+        output_pdf_path="RX_key exchange_latency.pdf")
+    plot_time_deltas_bar(
+        dtimes_encrypt_B,
+        bin_size=10,
+        title="RX decryption latency",
+        xlim_max=300,
+        show_overflow_bins=True,
+        output_pdf_path="RX_encryption_latency.pdf")
+    plot_time_deltas_bar(
+        dtimes_sign_B,
+        bin_size=10,
+        title="RX digital signature verification latency",
+        xlim_max=300,
+        show_overflow_bins=True,
+        output_pdf_path="RX_signature_latency.pdf")
 
