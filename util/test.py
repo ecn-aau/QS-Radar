@@ -6,6 +6,7 @@ from dataPlotter import *
 import numpy as np
 
 if __name__ == "__main__":
+
     # Path to your log file
     logA_file_path = "../data/20km/ML-DSA-87/logA.log"
     logB_file_path = "../data/20km/ML-DSA-87/logB.log"
@@ -18,23 +19,33 @@ if __name__ == "__main__":
     full_logsA = extract_logs_by_level(logA_lines, ["INFO", "DEBUG", "ERROR"])
     full_logsB = extract_logs_by_level(logB_lines, ["INFO", "DEBUG", "ERROR"])
 
-    # Parse known errors
-    parsed_logsA, num_errors_A = remove_error_blocks_between_patterns(
+    # Parse known errors in TX
+    # - RX errors on TX log
+    parsed_logsA, num_errors_A_RX = remove_error_blocks_between_patterns(
         full_logsA,
         "Raw packet received",
         "Encrypted and signed payload forwarded",
         pattern_match_fn=log_contains_pattern,
         inclusive=True,
         error_filter_pattern="HTTP error occurred: 500 Server Error: INTERNAL SERVER ERROR for url: http://192.168.3.102:8080/")
-    print(f"Parsed {num_errors_A} errors in TX")
-    parsed_logsB, num_errors_B = remove_error_blocks_between_patterns(
+    print(f"Parsed {num_errors_A_RX} errors in TX: Originating from RX")
+    # - Another error...TODO
+
+    num_errors_A = num_errors_A_RX # + ...
+
+    # Parse known errors in RX
+    # - RX not finding QKD key on receiver
+    parsed_logsB, num_errors_B_QKD = remove_error_blocks_between_patterns(
         full_logsB,
         "Encrypted and signed payload received",
         "Raw packet forwarded",
         pattern_match_fn=log_contains_pattern,
         inclusive=True,
         error_filter_pattern="HTTP error occurred: 404 Client Error: Not Found for url: https://192.168.3.128:8200/")
-    print(f"Parsed {num_errors_B} errors in RX")
+    print(f"Parsed {num_errors_B_QKD} errors in RX: QKD key not found")
+    # - Another error...TODO
+
+    num_errors_B = num_errors_B_QKD # + ...
 
     # Check for error in the data
     if(contains_error_log(parsed_logsA) or contains_error_log(parsed_logsB)):
@@ -47,6 +58,8 @@ if __name__ == "__main__":
         end_pattern="Encrypted and signed payload forwarded",
         use_regex=False
     )
+    if dtimes_tx_A is None:
+        raise KeyboardInterrupt("Terminating: No data to work with in TX")
     dtimes_QKD_key_A = elapsed_time_between_patterns(
         logs=parsed_logsA,  # list of parsed logs
         start_pattern="Starting new HTTPS connection (1): 192.168.3.126",
@@ -73,6 +86,8 @@ if __name__ == "__main__":
         end_pattern="Raw packet forwarded",
         use_regex=False
     )
+    if dtimes_rx_B is None:
+        raise KeyboardInterrupt("Terminating: No data to work with in RX")
     dtimes_QKD_key_B = elapsed_time_between_patterns(
         logs=parsed_logsB,  # list of parsed logs
         start_pattern="Starting new HTTPS connection (1): 192.168.3.128",
@@ -98,11 +113,19 @@ if __name__ == "__main__":
     avg_time_QKD_key_A = np.mean(dtimes_QKD_key_A)
     avg_time_encrypt_A = np.mean(dtimes_encrypt_A)
     avg_time_sign_A = np.mean(dtimes_sign_A)
+    avg_time_crypto_A = np.mean([dtimes_QKD_key_A, dtimes_encrypt_A, dtimes_sign_A])
     # - Standard deviation
     std_time_tx_A = np.std(dtimes_tx_A)
     std_time_QKD_key_A = np.std(dtimes_QKD_key_A)
     std_time_encrypt_A = np.std(dtimes_encrypt_A)
     std_time_sign_A = np.std(dtimes_sign_A)
+    std_time_crypto_A = np.std([dtimes_QKD_key_A, dtimes_encrypt_A, dtimes_sign_A])
+    # - Error rates (TODO)
+    err_rate_tx_A = 0
+    err_rate_QKD_key_A = 0
+    err_rate_encrypt_A = 0
+    err_rate_sign_A = 0
+    err_rate_crypto_A = 0
 
     # Calculate RX metrics
     # - Mean
@@ -110,65 +133,65 @@ if __name__ == "__main__":
     avg_time_QKD_key_B = np.mean(dtimes_QKD_key_B)
     avg_time_encrypt_B = np.mean(dtimes_encrypt_B)
     avg_time_sign_B = np.mean(dtimes_sign_B)
+    avg_time_crypto_B = np.mean([dtimes_QKD_key_B, dtimes_encrypt_B, dtimes_sign_B])
     # - Standard deviation
     std_time_rx_B = np.std(dtimes_rx_B)
     std_time_QKD_key_B = np.std(dtimes_QKD_key_B)
     std_time_encrypt_B = np.std(dtimes_encrypt_B)
     std_time_sign_B = np.std(dtimes_sign_B)
+    std_time_crypto_B = np.std([dtimes_QKD_key_B, dtimes_encrypt_B, dtimes_sign_B])
+    # - Error rates (TODO)
+    err_rate_rx_B = (num_errors_B / (num_errors_B + len(dtimes_rx_B))) * 100
+    err_rate_QKD_key_B = (num_errors_B_QKD / (num_errors_B + len(dtimes_rx_B))) * 100
+    err_rate_encrypt_B = 0
+    err_rate_sign_B = 0
+    err_rate_crypto_B = err_rate_QKD_key_B + err_rate_encrypt_B + err_rate_sign_B
 
     # Print TX metrics
     print("TX average latencies:")
-    if avg_time_tx_A is None:
-        print("- Full payload processing: No valid start-end pairs found.")
-    else:
-        print("- Full payload processing:")
-        print(f"-- Mean: {avg_time_tx_A:.2f} ms")
-        print(f"-- Standard deviation: {std_time_tx_A:.2f} ms")
-    if avg_time_QKD_key_A is None:
-        print("- QKD key collection: No valid start-end pairs found.")
-    else:
-        print("- QKD key collection:")
-        print(f"-- Mean: {avg_time_QKD_key_A:.2f} ms")
-        print(f"-- Standard deviation: {std_time_QKD_key_A:.2f} ms")
-    if avg_time_encrypt_A is None:
-        print("- Encryption: No valid start-end pairs found.")
-    else:
-        print("- Encryption:")
-        print(f"-- Mean: {avg_time_encrypt_A:.2f} ms")
-        print(f"-- Standard deviation: {std_time_encrypt_A:.2f} ms")
-    if avg_time_sign_A is None:
-        print("- Signature: No valid start-end pairs found.")
-    else:
-        print("- Signature:")
-        print(f"-- Mean: {avg_time_sign_A:.2f} ms")
-        print(f"-- Standard deviation: {std_time_sign_A:.2f} ms")
+    print("- Full payload processing:")
+    print(f"-- Mean: {avg_time_tx_A:.2f} ms")
+    print(f"-- Standard deviation: {std_time_tx_A:.2f} ms")
+    print(f"-- Error rate: {err_rate_tx_A:.2f} %")
+    print("- Crypto processing:")
+    print(f"-- Mean: {avg_time_crypto_A:.2f} ms")
+    print(f"-- Standard deviation: {std_time_crypto_A:.2f} ms")
+    print(f"-- Error rate: {err_rate_crypto_A:.2f} %")
+    print("- QKD key collection:")
+    print(f"-- Mean: {avg_time_QKD_key_A:.2f} ms")
+    print(f"-- Standard deviation: {std_time_QKD_key_A:.2f} ms")
+    print(f"-- Error rate: {err_rate_QKD_key_A:.2f} %")
+    print("- Encryption:")
+    print(f"-- Mean: {avg_time_encrypt_A:.2f} ms")
+    print(f"-- Standard deviation: {std_time_encrypt_A:.2f} ms")
+    print(f"-- Error rate: {err_rate_encrypt_A:.2f} %")
+    print("- Signature:")
+    print(f"-- Mean: {avg_time_sign_A:.2f} ms")
+    print(f"-- Standard deviation: {std_time_sign_A:.2f} ms")
+    print(f"-- Error rate: {err_rate_sign_A:.2f} %")
 
     # Print RX metrics
     print("RX average latencies:")
-    if avg_time_rx_B is None:
-        print("- Full payload processing: No valid start-end pairs found.")
-    else:
-        print("- Full payload processing:")
-        print(f"-- Mean: {avg_time_rx_B:.2f} ms")
-        print(f"-- Standard deviation: {std_time_rx_B:.2f} ms")
-    if avg_time_QKD_key_B is None:
-        print("- QKD key collection: No valid start-end pairs found.")
-    else:
-        print("- QKD key collection:")
-        print(f"-- Mean: {avg_time_QKD_key_B:.2f} ms")
-        print(f"-- Standard deviation: {std_time_QKD_key_B:.2f} ms")
-    if avg_time_encrypt_B is None:
-        print("- Encryption: No valid start-end pairs found.")
-    else:
-        print("- Encryption:")
-        print(f"-- Mean: {avg_time_encrypt_B:.2f} ms")
-        print(f"-- Standard deviation: {std_time_encrypt_B:.2f} ms")
-    if avg_time_sign_B is None:
-        print("- Signature: No valid start-end pairs found.")
-    else:
-        print("- Signature:")
-        print(f"-- Mean: {avg_time_sign_B:.2f} ms")
-        print(f"-- Standard deviation: {std_time_sign_B:.2f} ms")
+    print("- Full payload processing:")
+    print(f"-- Mean: {avg_time_rx_B:.2f} ms")
+    print(f"-- Standard deviation: {std_time_rx_B:.2f} ms")
+    print(f"-- Error rate: {err_rate_rx_B:.2f} %")
+    print("- Crypto processing:")
+    print(f"-- Mean: {avg_time_crypto_B:.2f} ms")
+    print(f"-- Standard deviation: {std_time_crypto_B:.2f} ms")
+    print(f"-- Error rate: {err_rate_crypto_B:.2f} %")
+    print("- QKD key collection:")
+    print(f"-- Mean: {avg_time_QKD_key_B:.2f} ms")
+    print(f"-- Standard deviation: {std_time_QKD_key_B:.2f} ms")
+    print(f"-- Error rate: {err_rate_QKD_key_B:.2f} %")
+    print("- Encryption:")
+    print(f"-- Mean: {avg_time_encrypt_B:.2f} ms")
+    print(f"-- Standard deviation: {std_time_encrypt_B:.2f} ms")
+    print(f"-- Error rate: {err_rate_encrypt_B:.2f} %")
+    print("- Signature:")
+    print(f"-- Mean: {avg_time_sign_B:.2f} ms")
+    print(f"-- Standard deviation: {std_time_sign_B:.2f} ms")
+    print(f"-- Error rate: {err_rate_sign_B:.2f} %")
 
     # Plot a histogram for the time deltas
     plot_time_deltas_bar(
