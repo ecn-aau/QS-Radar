@@ -1,3 +1,5 @@
+import sys
+
 import requests
 import base64
 import hashlib
@@ -123,24 +125,28 @@ if __name__ == "__main__":
         tx_count += 1
         logging.info(f"TX count: {tx_count}")
 
-        data, addr = sock.recvfrom(65535)
+        try:
+            data, addr = sock.recvfrom(65535)
 
-        hash = hashlib.sha256(data).hexdigest()
-        print(f"Raw packet received: SHA-256 {hash}")
-        logging.info(f"Raw packet received: SHA-256 {hash}")
-    
-        key_ID, key = request_qkd_key()
-        logging.debug(f"QKD key collected: ID {key_ID}")
+            hash = hashlib.sha256(data).hexdigest()
+            print(f"Raw packet received: SHA-256 {hash}")
+            logging.info(f"Raw packet received: SHA-256 {hash}")
 
-        encrypted_data = encrypt_data(data=data, key=key)
-        encrypted_data["key_ID"] = key_ID
-        logging.debug(f"Encrypted data with key: ID {key_ID}")
+            key_ID, key = request_qkd_key()
+            logging.debug(f"QKD key collected: ID {key_ID}")
 
-        payload = sign_data(encrypted_data=encrypted_data, private_key=pv_key)
-        logging.debug(f"Signed data with private key: {SIGALG}")
+            encrypted_data = encrypt_data(data=data, key=key)
+            encrypted_data["key_ID"] = key_ID
+            logging.debug(f"Encrypted data with key: ID {key_ID}")
 
-        send_data(payload=payload)
-        print(f"Encrypted and signed payload forwarded: SHA-256 {hash}")
-        logging.info(f"Encrypted and signed payload forwarded: SHA-256 {hash}")
+            payload = sign_data(encrypted_data=encrypted_data, private_key=pv_key)
+            logging.debug(f"Signed data with private key: {SIGALG}")
+
+            send_data(payload=payload)
+            print(f"Encrypted and signed payload forwarded: SHA-256 {hash}")
+            logging.info(f"Encrypted and signed payload forwarded: SHA-256 {hash}")
+        except:
+            logging.warning("Skipping this payload due to error")
+            continue
 
     logging.info(f"Ending QS-Radar: Signature {SIGALG} + QKD")
