@@ -123,6 +123,7 @@ if __name__ == "__main__":
     tx_count = 0
     while tx_count < max_tx:
         tx_count += 1
+        print(f"TX: {tx_count}")
         logging.info(f"TX count: {tx_count}")
 
         try:
