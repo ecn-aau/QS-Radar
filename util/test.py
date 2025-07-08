@@ -60,6 +60,12 @@ if __name__ == "__main__":
     )
     if dtimes_tx_A is None:
         raise KeyboardInterrupt("Terminating: No data to work with in TX")
+    dtimes_crypto_A = elapsed_time_between_patterns(
+        logs=parsed_logsA,
+        start_pattern="Starting new HTTPS connection (1): 192.168.3.126",
+        end_pattern="Signed data with private key",
+        use_regex=False
+    )
     dtimes_QKD_key_A = elapsed_time_between_patterns(
         logs=parsed_logsA,  # list of parsed logs
         start_pattern="Starting new HTTPS connection (1): 192.168.3.126",
@@ -88,6 +94,11 @@ if __name__ == "__main__":
     )
     if dtimes_rx_B is None:
         raise KeyboardInterrupt("Terminating: No data to work with in RX")
+    dtimes_crypto_B = elapsed_time_between_patterns(
+        logs=parsed_logsB,
+        start_pattern="Encrypted and signed payload received",
+        end_pattern="Decrypted data with key",
+    )
     dtimes_QKD_key_B = elapsed_time_between_patterns(
         logs=parsed_logsB,  # list of parsed logs
         start_pattern="Starting new HTTPS connection (1): 192.168.3.128",
@@ -107,19 +118,27 @@ if __name__ == "__main__":
         use_regex=False
     )
 
+    # Collect transmission time of payload
+    dtimes_payload = elapsed_time_between_patterns(
+        logs=parsed_logsA,
+        start_pattern="Starting new HTTP connection (1): 192.168.3.102",
+        end_pattern="http://192.168.3.102:8080",
+        use_regex=False
+    )
+
     # Calculated TX metrics
     # - Mean
     avg_time_tx_A = np.mean(dtimes_tx_A)
     avg_time_QKD_key_A = np.mean(dtimes_QKD_key_A)
     avg_time_encrypt_A = np.mean(dtimes_encrypt_A)
     avg_time_sign_A = np.mean(dtimes_sign_A)
-    avg_time_crypto_A = np.mean([dtimes_QKD_key_A, dtimes_encrypt_A, dtimes_sign_A])
+    avg_time_crypto_A = np.mean(dtimes_crypto_A)
     # - Standard deviation
     std_time_tx_A = np.std(dtimes_tx_A)
     std_time_QKD_key_A = np.std(dtimes_QKD_key_A)
     std_time_encrypt_A = np.std(dtimes_encrypt_A)
     std_time_sign_A = np.std(dtimes_sign_A)
-    std_time_crypto_A = np.std([dtimes_QKD_key_A, dtimes_encrypt_A, dtimes_sign_A])
+    std_time_crypto_A = np.std(dtimes_crypto_A)
     # - Error rates (TODO)
     err_rate_tx_A = 0
     err_rate_QKD_key_A = 0
@@ -133,13 +152,13 @@ if __name__ == "__main__":
     avg_time_QKD_key_B = np.mean(dtimes_QKD_key_B)
     avg_time_encrypt_B = np.mean(dtimes_encrypt_B)
     avg_time_sign_B = np.mean(dtimes_sign_B)
-    avg_time_crypto_B = np.mean([dtimes_QKD_key_B, dtimes_encrypt_B, dtimes_sign_B])
+    avg_time_crypto_B = np.mean(dtimes_crypto_B)
     # - Standard deviation
     std_time_rx_B = np.std(dtimes_rx_B)
     std_time_QKD_key_B = np.std(dtimes_QKD_key_B)
     std_time_encrypt_B = np.std(dtimes_encrypt_B)
     std_time_sign_B = np.std(dtimes_sign_B)
-    std_time_crypto_B = np.std([dtimes_QKD_key_B, dtimes_encrypt_B, dtimes_sign_B])
+    std_time_crypto_B = np.std(dtimes_crypto_B)
     # - Error rates (TODO)
     err_rate_rx_B = (num_errors_B / (num_errors_B + len(dtimes_rx_B))) * 100
     err_rate_QKD_key_B = (num_errors_B_QKD / (num_errors_B + len(dtimes_rx_B))) * 100
@@ -147,12 +166,24 @@ if __name__ == "__main__":
     err_rate_sign_B = 0
     err_rate_crypto_B = err_rate_QKD_key_B + err_rate_encrypt_B + err_rate_sign_B
 
+    # Calculate payload metrics
+    # - Mean
+    avg_time_payload = np.mean(dtimes_payload)
+    # - Standard deviation
+    std_time_payload = np.std(dtimes_payload)
+    # - Error rates (TODO)
+    err_rate_payload = 0
+
     # Print TX metrics
     print("TX average latencies:")
     print("- Full payload processing:")
     print(f"-- Mean: {avg_time_tx_A:.2f} ms")
     print(f"-- Standard deviation: {std_time_tx_A:.2f} ms")
     print(f"-- Error rate: {err_rate_tx_A:.2f} %")
+    print("- Payload transmission:")
+    print(f"-- Mean: {avg_time_payload:.2f} ms")
+    print(f"-- Standard deviation: {std_time_payload:.2f} ms")
+    print(f"-- Error rate: {err_rate_payload:.2f} %")
     print("- Crypto processing:")
     print(f"-- Mean: {avg_time_crypto_A:.2f} ms")
     print(f"-- Standard deviation: {std_time_crypto_A:.2f} ms")
@@ -202,6 +233,14 @@ if __name__ == "__main__":
         show_overflow_bins=True,
         output_pdf_path="TX_payload_processing_latency.pdf")
     plot_time_deltas_bar(
+        dtimes_crypto_A,
+        bin_size=10,
+        title="TX cryptography processing latency",
+        xlim_max=300,
+        show_overflow_bins=True,
+        output_pdf_path="TX_crypto_processing_latency.pdf"
+    )
+    plot_time_deltas_bar(
         dtimes_QKD_key_A,
         bin_size=10,
         title="TX key exchange latency",
@@ -231,6 +270,14 @@ if __name__ == "__main__":
         show_overflow_bins=True,
         output_pdf_path="RX_payload_processing_latency.pdf")
     plot_time_deltas_bar(
+        dtimes_crypto_B,
+        bin_size=10,
+        title="RX cryptography processing latency",
+        xlim_max=300,
+        show_overflow_bins=True,
+        output_pdf_path="RX_crypto_latency.pdf"
+    )
+    plot_time_deltas_bar(
         dtimes_QKD_key_B,
         bin_size=10,
         title="RX key exchange latency",
@@ -251,4 +298,13 @@ if __name__ == "__main__":
         xlim_max=300,
         show_overflow_bins=True,
         output_pdf_path="RX_signature_latency.pdf")
+
+    plot_time_deltas_bar(
+        dtimes_payload,
+        bin_size=10,
+        title="Payload transmission latency",
+        xlim_max=300,
+        show_overflow_bins=True,
+        output_pdf_path="payload_transmission_latency.pdf"
+    )
 
