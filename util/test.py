@@ -6,8 +6,8 @@ import numpy as np
 if __name__ == "__main__":
 
     # Path to your log file
-    logA_file_path = "../data/20km/ML-DSA-87/logA.log"
-    logB_file_path = "../data/20km/ML-DSA-87/logB.log"
+    logA_file_path = "../data/20km/ML-DSA-44/logA.log"
+    logB_file_path = "../data/20km/ML-DSA-44/logB.log"
 
     # Read the log file
     logA_lines = read_log_file(logA_file_path)
@@ -58,7 +58,7 @@ if __name__ == "__main__":
 
     # Check for error in the data
     if(contains_error_log(parsed_logsA) or contains_error_log(parsed_logsB)):
-        raise KeyboardInterrupt(f"Terminating test do to unexpected errors")
+        raise KeyboardInterrupt(f"Terminating test do to unexpected errors: Check log and add unknown errors to parsing.")
 
     # Collect time deltas between specific logs on TX
     dtimes_tx_A = elapsed_time_between_patterns(
@@ -148,6 +148,13 @@ if __name__ == "__main__":
     std_time_encrypt_A = np.std(dtimes_encrypt_A)
     std_time_sign_A = np.std(dtimes_sign_A)
     std_time_crypto_A = np.std(dtimes_crypto_A)
+    # - Max
+    max_time_tx_A = np.max(dtimes_tx_A)
+    max_time_QKD_key_A = np.max(dtimes_QKD_key_A)
+    max_time_encrypt_A = np.max(dtimes_encrypt_A)
+    max_time_sign_A = np.max(dtimes_sign_A)
+    max_time_crypto_A = np.max(dtimes_crypto_A)
+
     # - Error rates
     err_rate_tx_A = (num_errors_A / (num_errors_A + len(dtimes_tx_A))) * 1000
     err_rate_QKD_key_A = (num_errors_A_QKD / (num_errors_A + len(dtimes_tx_A))) * 1000
@@ -168,6 +175,12 @@ if __name__ == "__main__":
     std_time_encrypt_B = np.std(dtimes_encrypt_B)
     std_time_sign_B = np.std(dtimes_sign_B)
     std_time_crypto_B = np.std(dtimes_crypto_B)
+    # - Max
+    max_time_rx_B = np.max(dtimes_rx_B)
+    max_time_QKD_key_B = np.max(dtimes_QKD_key_B)
+    max_time_encrypt_B = np.max(dtimes_encrypt_B)
+    max_time_sign_B = np.max(dtimes_sign_B)
+    max_time_crypto_B = np.max(dtimes_crypto_B)
     # - Error rates
     err_rate_rx_B = (num_errors_B / (num_errors_B + len(dtimes_rx_B))) * 1000
     err_rate_QKD_key_B = (num_errors_B_QKD / (num_errors_B + len(dtimes_rx_B))) * 1000
@@ -180,6 +193,8 @@ if __name__ == "__main__":
     avg_time_payload = np.mean(dtimes_payload)
     # - Standard deviation
     std_time_payload = np.std(dtimes_payload)
+    # - Max
+    max_time_payload = np.max(dtimes_payload)
     # - Error rates
     err_rate_payload = 0 # Placeholder
 
@@ -188,26 +203,32 @@ if __name__ == "__main__":
     print("- Full payload processing:")
     print(f"-- Mean: {avg_time_tx_A:.2f} ms")
     print(f"-- Standard deviation: {std_time_tx_A:.2f} ms")
+    print(f"-- Max: {max_time_tx_A:.0f} ms")
     print(f"-- Error rate: {err_rate_tx_A:.2f} ‰")
     print("- Payload transmission:")
     print(f"-- Mean: {avg_time_payload:.2f} ms")
     print(f"-- Standard deviation: {std_time_payload:.2f} ms")
+    print(f"-- Max: {max_time_payload:.0f} ms")
     print(f"-- Error rate: {err_rate_payload:.2f} ‰")
     print("- Crypto processing:")
     print(f"-- Mean: {avg_time_crypto_A:.2f} ms")
     print(f"-- Standard deviation: {std_time_crypto_A:.2f} ms")
+    print(f"-- Max: {max_time_crypto_A:.0f} ms")
     print(f"-- Error rate: {err_rate_crypto_A:.2f} ‰")
     print("- QKD key collection:")
     print(f"-- Mean: {avg_time_QKD_key_A:.2f} ms")
     print(f"-- Standard deviation: {std_time_QKD_key_A:.2f} ms")
+    print(f"-- Max: {max_time_QKD_key_A:.0f} ms")
     print(f"-- Error rate: {err_rate_QKD_key_A:.2f} ‰")
     print("- Encryption:")
     print(f"-- Mean: {avg_time_encrypt_A:.2f} ms")
     print(f"-- Standard deviation: {std_time_encrypt_A:.2f} ms")
+    print(f"-- Max: {max_time_encrypt_A:.0f} ms")
     print(f"-- Error rate: {err_rate_encrypt_A:.2f} ‰")
     print("- Signature:")
     print(f"-- Mean: {avg_time_sign_A:.2f} ms")
     print(f"-- Standard deviation: {std_time_sign_A:.2f} ms")
+    print(f"-- Max: {max_time_sign_A:.0f} ms")
     print(f"-- Error rate: {err_rate_sign_A:.2f} ‰")
 
     # Print RX metrics
@@ -215,22 +236,27 @@ if __name__ == "__main__":
     print("- Full payload processing:")
     print(f"-- Mean: {avg_time_rx_B:.2f} ms")
     print(f"-- Standard deviation: {std_time_rx_B:.2f} ms")
+    print(f"-- Max: {max_time_rx_B:.0f} ms")
     print(f"-- Error rate: {err_rate_rx_B:.2f} ‰")
     print("- Crypto processing:")
     print(f"-- Mean: {avg_time_crypto_B:.2f} ms")
     print(f"-- Standard deviation: {std_time_crypto_B:.2f} ms")
+    print(f"-- Max: {max_time_crypto_B:.0f} ms")
     print(f"-- Error rate: {err_rate_crypto_B:.2f} ‰")
     print("- QKD key collection:")
     print(f"-- Mean: {avg_time_QKD_key_B:.2f} ms")
     print(f"-- Standard deviation: {std_time_QKD_key_B:.2f} ms")
+    print(f"-- Max: {max_time_QKD_key_B:.0f} ms")
     print(f"-- Error rate: {err_rate_QKD_key_B:.2f} ‰")
     print("- Encryption:")
     print(f"-- Mean: {avg_time_encrypt_B:.2f} ms")
     print(f"-- Standard deviation: {std_time_encrypt_B:.2f} ms")
+    print(f"-- Max: {max_time_encrypt_B:.0f} ms")
     print(f"-- Error rate: {err_rate_encrypt_B:.2f} ‰")
     print("- Signature:")
     print(f"-- Mean: {avg_time_sign_B:.2f} ms")
     print(f"-- Standard deviation: {std_time_sign_B:.2f} ms")
+    print(f"-- Max: {max_time_sign_B:.0f} ms")
     print(f"-- Error rate: {err_rate_sign_B:.2f} ‰")
 
     # Plot a histogram for the time deltas
