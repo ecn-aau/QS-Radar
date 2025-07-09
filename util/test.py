@@ -1,5 +1,3 @@
-import statistics
-
 from dataParser import *
 from dataPlotter import *
 
@@ -29,9 +27,19 @@ if __name__ == "__main__":
         inclusive=True,
         error_filter_pattern="HTTP error occurred: 500 Server Error: INTERNAL SERVER ERROR for url: http://192.168.3.102:8080/")
     print(f"Parsed {num_errors_A_RX} errors in TX: Originating from RX")
+    # - TX failed to get QKD key (QKD internal error)
+    parsed_logsA, num_errors_A_QKD = remove_error_blocks_between_patterns(
+        parsed_logsA,
+        "Raw packet received",
+        "Encrypted and signed payload forwarded",
+        pattern_match_fn=log_contains_pattern,
+        inclusive=True,
+        error_filter_pattern="HTTP error occurred: 500 Server Error: Internal Server Error for url: https://192.168.3.126:8200/")
+    print(f"Parsed {num_errors_A_QKD} errors in TX: QKD internal server error")
     # - Another error...TODO
 
-    num_errors_A = num_errors_A_RX # + ...
+    # Total errors in TX (ignoring originating from RX)
+    num_errors_A = num_errors_A_QKD# + ...
 
     # Parse known errors in RX
     # - RX not finding QKD key on receiver
@@ -45,6 +53,7 @@ if __name__ == "__main__":
     print(f"Parsed {num_errors_B_QKD} errors in RX: QKD key not found")
     # - Another error...TODO
 
+    # Total number of errors in RX
     num_errors_B = num_errors_B_QKD # + ...
 
     # Check for error in the data
@@ -139,12 +148,12 @@ if __name__ == "__main__":
     std_time_encrypt_A = np.std(dtimes_encrypt_A)
     std_time_sign_A = np.std(dtimes_sign_A)
     std_time_crypto_A = np.std(dtimes_crypto_A)
-    # - Error rates (TODO)
-    err_rate_tx_A = 0
-    err_rate_QKD_key_A = 0
-    err_rate_encrypt_A = 0
-    err_rate_sign_A = 0
-    err_rate_crypto_A = 0
+    # - Error rates
+    err_rate_tx_A = (num_errors_A / (num_errors_A + len(dtimes_tx_A))) * 1000
+    err_rate_QKD_key_A = (num_errors_A_QKD / (num_errors_A + len(dtimes_tx_A))) * 1000
+    err_rate_encrypt_A = 0 # Placeholder
+    err_rate_sign_A = 0 # Placeholder
+    err_rate_crypto_A = err_rate_QKD_key_A + err_rate_encrypt_A + err_rate_sign_A
 
     # Calculate RX metrics
     # - Mean
@@ -159,11 +168,11 @@ if __name__ == "__main__":
     std_time_encrypt_B = np.std(dtimes_encrypt_B)
     std_time_sign_B = np.std(dtimes_sign_B)
     std_time_crypto_B = np.std(dtimes_crypto_B)
-    # - Error rates (TODO)
-    err_rate_rx_B = (num_errors_B / (num_errors_B + len(dtimes_rx_B))) * 100
-    err_rate_QKD_key_B = (num_errors_B_QKD / (num_errors_B + len(dtimes_rx_B))) * 100
-    err_rate_encrypt_B = 0
-    err_rate_sign_B = 0
+    # - Error rates
+    err_rate_rx_B = (num_errors_B / (num_errors_B + len(dtimes_rx_B))) * 1000
+    err_rate_QKD_key_B = (num_errors_B_QKD / (num_errors_B + len(dtimes_rx_B))) * 1000
+    err_rate_encrypt_B = 0 # Placeholder
+    err_rate_sign_B = 0 # Placeholder
     err_rate_crypto_B = err_rate_QKD_key_B + err_rate_encrypt_B + err_rate_sign_B
 
     # Calculate payload metrics
@@ -171,58 +180,58 @@ if __name__ == "__main__":
     avg_time_payload = np.mean(dtimes_payload)
     # - Standard deviation
     std_time_payload = np.std(dtimes_payload)
-    # - Error rates (TODO)
-    err_rate_payload = 0
+    # - Error rates
+    err_rate_payload = 0 # Placeholder
 
     # Print TX metrics
     print("TX average latencies:")
     print("- Full payload processing:")
     print(f"-- Mean: {avg_time_tx_A:.2f} ms")
     print(f"-- Standard deviation: {std_time_tx_A:.2f} ms")
-    print(f"-- Error rate: {err_rate_tx_A:.2f} %")
+    print(f"-- Error rate: {err_rate_tx_A:.2f} ‰")
     print("- Payload transmission:")
     print(f"-- Mean: {avg_time_payload:.2f} ms")
     print(f"-- Standard deviation: {std_time_payload:.2f} ms")
-    print(f"-- Error rate: {err_rate_payload:.2f} %")
+    print(f"-- Error rate: {err_rate_payload:.2f} ‰")
     print("- Crypto processing:")
     print(f"-- Mean: {avg_time_crypto_A:.2f} ms")
     print(f"-- Standard deviation: {std_time_crypto_A:.2f} ms")
-    print(f"-- Error rate: {err_rate_crypto_A:.2f} %")
+    print(f"-- Error rate: {err_rate_crypto_A:.2f} ‰")
     print("- QKD key collection:")
     print(f"-- Mean: {avg_time_QKD_key_A:.2f} ms")
     print(f"-- Standard deviation: {std_time_QKD_key_A:.2f} ms")
-    print(f"-- Error rate: {err_rate_QKD_key_A:.2f} %")
+    print(f"-- Error rate: {err_rate_QKD_key_A:.2f} ‰")
     print("- Encryption:")
     print(f"-- Mean: {avg_time_encrypt_A:.2f} ms")
     print(f"-- Standard deviation: {std_time_encrypt_A:.2f} ms")
-    print(f"-- Error rate: {err_rate_encrypt_A:.2f} %")
+    print(f"-- Error rate: {err_rate_encrypt_A:.2f} ‰")
     print("- Signature:")
     print(f"-- Mean: {avg_time_sign_A:.2f} ms")
     print(f"-- Standard deviation: {std_time_sign_A:.2f} ms")
-    print(f"-- Error rate: {err_rate_sign_A:.2f} %")
+    print(f"-- Error rate: {err_rate_sign_A:.2f} ‰")
 
     # Print RX metrics
     print("RX average latencies:")
     print("- Full payload processing:")
     print(f"-- Mean: {avg_time_rx_B:.2f} ms")
     print(f"-- Standard deviation: {std_time_rx_B:.2f} ms")
-    print(f"-- Error rate: {err_rate_rx_B:.2f} %")
+    print(f"-- Error rate: {err_rate_rx_B:.2f} ‰")
     print("- Crypto processing:")
     print(f"-- Mean: {avg_time_crypto_B:.2f} ms")
     print(f"-- Standard deviation: {std_time_crypto_B:.2f} ms")
-    print(f"-- Error rate: {err_rate_crypto_B:.2f} %")
+    print(f"-- Error rate: {err_rate_crypto_B:.2f} ‰")
     print("- QKD key collection:")
     print(f"-- Mean: {avg_time_QKD_key_B:.2f} ms")
     print(f"-- Standard deviation: {std_time_QKD_key_B:.2f} ms")
-    print(f"-- Error rate: {err_rate_QKD_key_B:.2f} %")
+    print(f"-- Error rate: {err_rate_QKD_key_B:.2f} ‰")
     print("- Encryption:")
     print(f"-- Mean: {avg_time_encrypt_B:.2f} ms")
     print(f"-- Standard deviation: {std_time_encrypt_B:.2f} ms")
-    print(f"-- Error rate: {err_rate_encrypt_B:.2f} %")
+    print(f"-- Error rate: {err_rate_encrypt_B:.2f} ‰")
     print("- Signature:")
     print(f"-- Mean: {avg_time_sign_B:.2f} ms")
     print(f"-- Standard deviation: {std_time_sign_B:.2f} ms")
-    print(f"-- Error rate: {err_rate_sign_B:.2f} %")
+    print(f"-- Error rate: {err_rate_sign_B:.2f} ‰")
 
     # Plot a histogram for the time deltas
     plot_time_deltas_bar(
