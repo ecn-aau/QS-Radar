@@ -6,6 +6,7 @@ output*
 # out/*
 keys/*
 util/*.pdf
+data/*
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
