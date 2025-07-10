@@ -1,5 +1,3 @@
-import sys
-
 import requests
 import base64
 import hashlib
@@ -7,6 +5,7 @@ import json
 import socket
 import logging
 import oqs
+import numpy as np
 
 from Crypto.Cipher import AES
 
@@ -14,6 +13,7 @@ CLIENT_A_KMS_HOST = "192.168.3.126" # Address of KMS, maybe there is only one
 CLIENT_A_KMS_PORT = "8200"
 CLIENT_A_KMS_BASE_URL = f"https://{CLIENT_A_KMS_HOST}:{CLIENT_A_KMS_PORT}/api/v1" # KMS cert might be self-signed?
 CLIENT_B_ID = "Bob254250"
+KEY_EXCHANGE = "QKD" # Options: QKD, ML-KEM-512, ML-KEM-768, ML-DSA-1024
 KEY_LENGTH = 256  # In bits
 KEY_AMOUNT = 1
 SIGALG = "ML-DSA-87"
@@ -62,6 +62,22 @@ def request_qkd_key() -> tuple[str, bytes]:
         logging.error(f"Request failed: {err}")
 
 
+def request_pqc_key() -> tuple[str, bytes]:
+    with oqs.KeyEncapsulation(KEY_EXCHANGE) as client:
+        KEM_pb_key = client.generate_public_key()
+
+        payload = {
+            "key_id": base64.b64encode(np.random.bytes(3)).decode(),
+            "public_key": base64.b64encode(KEM_pb_key).decode(),
+        }
+
+        response = requests.post(url="http://192.168.3.102:8080", json=payload, timeout=10)
+        response.raise_for_status()
+        shared_secret = client.decap_secret(response['cyphertext'])
+
+        return payload['key_id'], shared_secret
+
+
 def encrypt_data(data: bytes, key: bytes) -> object:
     cipher = AES.new(key, AES.MODE_GCM)
     nonce = cipher.nonce
@@ -76,7 +92,7 @@ def encrypt_data(data: bytes, key: bytes) -> object:
 
 def send_data(payload) -> None:
     try:
-        hash = hashlib.sha256(json.dumps(payload).encode()).hexdigest()
+        # hash = hashlib.sha256(json.dumps(payload).encode()).hexdigest() # (TODO: Unnecessary line?)
         response = requests.post(url="http://192.168.3.102:8080", json=payload, timeout=10)
         response.raise_for_status()
     except requests.exceptions.HTTPError as http_err:
@@ -110,7 +126,7 @@ if __name__ == "__main__":
     # Launch parameters
     UDP_IP = "127.0.0.1"
     UDP_PORT = 56000
-    max_tx = 10 ** 6
+    max_tx = 10 ** 5
 
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     sock.bind((UDP_IP, UDP_PORT))
@@ -133,8 +149,12 @@ if __name__ == "__main__":
             print(f"Raw packet received: SHA-256 {hash}")
             logging.info(f"Raw packet received: SHA-256 {hash}")
 
-            key_ID, key = request_qkd_key()
-            logging.debug(f"QKD key collected: ID {key_ID}")
+            if KEY_EXCHANGE == "QKD":
+                key_ID, key = request_qkd_key()
+                logging.debug(f"QKD key collected: ID {key_ID}")
+            else:
+                key_ID, key = request_pqc_key()
+                logging.debug(f"PQC key collected: ID {key_ID}")
 
             encrypted_data = encrypt_data(data=data, key=key)
             encrypted_data["key_ID"] = key_ID

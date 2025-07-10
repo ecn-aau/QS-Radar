@@ -14,6 +14,7 @@ CLIENT_B_KMS_HOST = "192.168.3.128" # Address of KMS, maybe there is only one
 CLIENT_B_KMS_PORT = "8200"
 CLIENT_B_KMS_BASE_URL = f"https://{CLIENT_B_KMS_HOST}:{CLIENT_B_KMS_PORT}/api/v1" # KMS cert might be self-signed?
 CLIENT_A_ID = "Alice254250"
+KEY_EXCHANGE = "QKD" # Options: QKD, ML_KEM-512, ML-KEM-768, ML-KEM-1024
 SIGALG = "ML-DSA-87"
 
 # Metrics
@@ -107,18 +108,17 @@ def get_public_key() -> bytes:
     public_key = data["public_key"]
     return base64.b64decode(public_key)
 
-app = Flask(__name__)
+def handle_KEM_post(payload: object):
+    print(f"Received KEM request: ID {payload['key_ID']}")
+    logging.debug(f"Received KEM request: ID {payload['key_ID']}")
 
-@app.route('/', methods=['POST'])
-def handle_post():
-    payload = request.data
-    
-    try:
-        payload = json.loads(payload)    
-    except json.JSONDecodeError:
-        logging.error("Invalid JSON")
-        return jsonify({'error': 'Invalid JSON'}), 400
+    with oqs.KeyEncapsulation(KEY_EXCHANGE) as server:
+        KEM_pb_key = payload['public_key']
+        ciphertext, shared_secret = server.encap_secret(KEM_pb_key)
 
+    return jsonify({'status': 'success', 'ciphertext': base64.b64encode(ciphertext).decode()}), 200
+
+def handle_RX_post(payload: object):
     hash = hashlib.sha256(request.data).hexdigest()
     print(f"Encrypted and signed payload received: SHA-256 {hash}")
     logging.info(f"Encrypted and signed payload received: SHA-256 {hash}")
@@ -140,6 +140,21 @@ def handle_post():
         return jsonify({'error': 'Invalid signature'}), 400
 
     return jsonify({'status': 'success'}), 200
+app = Flask(__name__)
+
+@app.route('/', methods=['POST'])
+def handle_post():
+    payload = request.data
+    try:
+        payload = json.loads(payload)
+    except json.JSONDecodeError:
+        logging.error("Invalid JSON")
+        return jsonify({'error': 'Invalid JSON'}), 400
+
+    if 'public_key' not in payload:
+        return handle_RX_post(payload=payload)
+    else:
+        return handle_KEM_post(payload=payload)
 
 if __name__ == '__main__':
     logging.info(f"Starting QS-Radar-C2: Signature {SIGALG} + QKD")
