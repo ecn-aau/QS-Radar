@@ -6,19 +6,18 @@ import logging
 import socket
 import oqs
 
+from random import randbytes
+from datetime import timedelta
 from Crypto.Cipher import AES
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, session
 
 
 CLIENT_B_KMS_HOST = "192.168.3.128" # Address of KMS, maybe there is only one
 CLIENT_B_KMS_PORT = "8200"
 CLIENT_B_KMS_BASE_URL = f"https://{CLIENT_B_KMS_HOST}:{CLIENT_B_KMS_PORT}/api/v1" # KMS cert might be self-signed?
 CLIENT_A_ID = "Alice254250"
-KEY_EXCHANGE = "QKD" # Options: QKD, ML_KEM-512, ML-KEM-768, ML-KEM-1024
+KEY_EXCHANGE = "BB84" # Options: BB84, ML_KEM-512, ML-KEM-768, ML-KEM-1024
 SIGALG = "ML-DSA-87"
-
-# Metrics
-rx_count = 0
 
 logging.basicConfig(
     filename="logB.log",
@@ -109,12 +108,13 @@ def get_public_key() -> bytes:
     return base64.b64decode(public_key)
 
 def handle_KEM_post(payload: object):
-    print(f"Received KEM request: ID {payload['key_ID']}")
     logging.debug(f"Received KEM request: ID {payload['key_ID']}")
 
     with oqs.KeyEncapsulation(KEY_EXCHANGE) as server:
-        KEM_pb_key = payload['public_key']
+        KEM_pb_key = base64.b64decode(payload['public_key'])
         ciphertext, shared_secret = server.encap_secret(KEM_pb_key)
+
+    session['shared_secret'] = shared_secret
 
     return jsonify({'status': 'success', 'ciphertext': base64.b64encode(ciphertext).decode()}), 200
 
@@ -126,8 +126,11 @@ def handle_RX_post(payload: object):
     if verify_signature(payload, get_public_key()):
         logging.debug(f"Verified signature: {SIGALG}")
 
-        key = request_qkd_key_with_ID(key_id=payload['key_ID'])
-        logging.debug(f"QKD key collected: ID {payload['key_ID']}")
+        if KEY_EXCHANGE == "BB84":
+            key = request_qkd_key_with_ID(key_id=payload['key_ID'])
+        else:
+            key = session.pop('shared_secret')
+        logging.debug(f"{KEY_EXCHANGE} key collected: ID {payload['key_ID']}")
 
         raw_data = decrypt_data(payload=payload, key=key)
         logging.debug(f"Decrypted data with key: ID {payload['key_ID']}")
@@ -141,6 +144,8 @@ def handle_RX_post(payload: object):
 
     return jsonify({'status': 'success'}), 200
 app = Flask(__name__)
+app.secret_key = randbytes(32)
+app.permanent_session_lifetime = timedelta(seconds=1)
 
 @app.route('/', methods=['POST'])
 def handle_post():
@@ -157,5 +162,5 @@ def handle_post():
         return handle_KEM_post(payload=payload)
 
 if __name__ == '__main__':
-    logging.info(f"Starting QS-Radar-C2: Signature {SIGALG} + QKD")
+    logging.info(f"Starting QS-Radar-C2: Signature {SIGALG} + {KEY_EXCHANGE}")
     app.run(host='0.0.0.0', port=8080)

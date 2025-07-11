@@ -5,15 +5,15 @@ import json
 import socket
 import logging
 import oqs
-import numpy as np
 
+from random import randbytes
 from Crypto.Cipher import AES
 
 CLIENT_A_KMS_HOST = "192.168.3.126" # Address of KMS, maybe there is only one
 CLIENT_A_KMS_PORT = "8200"
 CLIENT_A_KMS_BASE_URL = f"https://{CLIENT_A_KMS_HOST}:{CLIENT_A_KMS_PORT}/api/v1" # KMS cert might be self-signed?
 CLIENT_B_ID = "Bob254250"
-KEY_EXCHANGE = "QKD" # Options: QKD, ML-KEM-512, ML-KEM-768, ML-DSA-1024
+KEY_EXCHANGE = "BB84" # Options: BB84, ML-KEM-512, ML-KEM-768, ML-DSA-1024
 KEY_LENGTH = 256  # In bits
 KEY_AMOUNT = 1
 SIGALG = "ML-DSA-87"
@@ -64,18 +64,18 @@ def request_qkd_key() -> tuple[str, bytes]:
 
 def request_pqc_key() -> tuple[str, bytes]:
     with oqs.KeyEncapsulation(KEY_EXCHANGE) as client:
-        KEM_pb_key = client.generate_public_key()
+        KEM_pb_key = client.generate_keypair()
 
         payload = {
-            "key_id": base64.b64encode(np.random.bytes(3)).decode(),
+            "key_ID": base64.b64encode(randbytes(3)).decode(),
             "public_key": base64.b64encode(KEM_pb_key).decode(),
         }
 
         response = requests.post(url="http://192.168.3.102:8080", json=payload, timeout=10)
         response.raise_for_status()
-        shared_secret = client.decap_secret(response['cyphertext'])
+        shared_secret = client.decap_secret(base64.b64decode(response.json()['ciphertext']))
 
-        return payload['key_id'], shared_secret
+        return payload['key_ID'], shared_secret
 
 
 def encrypt_data(data: bytes, key: bytes) -> object:
@@ -121,7 +121,7 @@ def sign_data(encrypted_data: object, private_key: bytes) -> object:
     return encrypted_data
 
 if __name__ == "__main__":
-    logging.info(f"Starting QS-Radar: Signature {SIGALG} + QKD")
+    logging.info(f"Starting QS-Radar: {SIGALG} + {KEY_EXCHANGE}")
 
     # Launch parameters
     UDP_IP = "127.0.0.1"
@@ -149,7 +149,7 @@ if __name__ == "__main__":
             print(f"Raw packet received: SHA-256 {hash}")
             logging.info(f"Raw packet received: SHA-256 {hash}")
 
-            if KEY_EXCHANGE == "QKD":
+            if KEY_EXCHANGE == "BB84":
                 key_ID, key = request_qkd_key()
                 logging.debug(f"QKD key collected: ID {key_ID}")
             else:
@@ -166,8 +166,9 @@ if __name__ == "__main__":
             send_data(payload=payload)
             print(f"Encrypted and signed payload forwarded: SHA-256 {hash}")
             logging.info(f"Encrypted and signed payload forwarded: SHA-256 {hash}")
-        except:
+        except Exception as e:
+            logging.error(e)
             logging.warning("Skipping this payload due to error")
             continue
 
-    logging.info(f"Ending QS-Radar: Signature {SIGALG} + QKD")
+    logging.info(f"Ending QS-Radar: {SIGALG} + {KEY_EXCHANGE}")
