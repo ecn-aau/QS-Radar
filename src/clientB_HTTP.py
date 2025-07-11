@@ -6,8 +6,6 @@ import logging
 import socket
 import oqs
 
-from random import randbytes
-from datetime import timedelta
 from Crypto.Cipher import AES
 from flask import Flask, request, jsonify, session
 
@@ -26,14 +24,14 @@ logging.basicConfig(
     level=logging.ERROR,
     filemode="x")
 
-def request_qkd_key_with_ID(key_id: str) -> bytes:
+def request_qkd_key_with_ID(key_ID: str) -> bytes:
     get_key_with_IDs_url = f"{CLIENT_B_KMS_BASE_URL}/keys/{CLIENT_A_ID}/dec_keys"
 
     # Based on https://www.etsi.org/deliver/etsi_gs/QKD/001_099/014/01.01.01_60/gs_qkd014v010101p.pdf Table 12
     payload = {
         "key_IDs": [
             {
-                "key_ID": key_id,
+                "key_ID": key_ID,
             }
         ],
     }
@@ -107,18 +105,18 @@ def get_public_key() -> bytes:
     public_key = data["public_key"]
     return base64.b64decode(public_key)
 
-def handle_KEM_post(payload: object):
-    logging.debug(f"Received KEM request: ID {payload['key_ID']}")
+app = Flask(__name__)
+app.secret_key = "TEMPLATE_KEY"
 
-    with oqs.KeyEncapsulation(KEY_EXCHANGE) as server:
-        KEM_pb_key = base64.b64decode(payload['public_key'])
-        ciphertext, shared_secret = server.encap_secret(KEM_pb_key)
+@app.route('/data', methods=['POST'])
+def handle_data():
+    payload = request.data
+    try:
+        payload = json.loads(payload)
+    except json.JSONDecodeError:
+        logging.error("Invalid JSON")
+        return jsonify({'error': 'Invalid JSON'}), 400
 
-    session['shared_secret'] = shared_secret
-
-    return jsonify({'status': 'success', 'ciphertext': base64.b64encode(ciphertext).decode()}), 200
-
-def handle_RX_post(payload: object):
     hash = hashlib.sha256(request.data).hexdigest()
     print(f"Encrypted and signed payload received: SHA-256 {hash}")
     logging.info(f"Encrypted and signed payload received: SHA-256 {hash}")
@@ -127,7 +125,7 @@ def handle_RX_post(payload: object):
         logging.debug(f"Verified signature: {SIGALG}")
 
         if KEY_EXCHANGE == "BB84":
-            key = request_qkd_key_with_ID(key_id=payload['key_ID'])
+            key = request_qkd_key_with_ID(key_ID=payload['key_ID'])
         else:
             key = session.pop('shared_secret')
         logging.debug(f"{KEY_EXCHANGE} key collected: ID {payload['key_ID']}")
@@ -143,12 +141,9 @@ def handle_RX_post(payload: object):
         return jsonify({'error': 'Invalid signature'}), 400
 
     return jsonify({'status': 'success'}), 200
-app = Flask(__name__)
-app.secret_key = randbytes(32)
-app.permanent_session_lifetime = timedelta(seconds=1)
 
-@app.route('/', methods=['POST'])
-def handle_post():
+@app.route('/kem', methods=['POST'])
+def handle_kem():
     payload = request.data
     try:
         payload = json.loads(payload)
@@ -156,11 +151,16 @@ def handle_post():
         logging.error("Invalid JSON")
         return jsonify({'error': 'Invalid JSON'}), 400
 
-    if 'public_key' not in payload:
-        return handle_RX_post(payload=payload)
-    else:
-        return handle_KEM_post(payload=payload)
+    logging.debug(f"Received KEM request: ID {payload['key_ID']}")
+
+    with oqs.KeyEncapsulation(KEY_EXCHANGE) as server:
+        KEM_pb_key = base64.b64decode(payload['public_key'])
+        ciphertext, shared_secret = server.encap_secret(KEM_pb_key)
+
+    session['shared_secret'] = shared_secret
+
+    return jsonify({'status': 'success', 'ciphertext': base64.b64encode(ciphertext).decode()}), 200
 
 if __name__ == '__main__':
-    logging.info(f"Starting QS-Radar-C2: Signature {SIGALG} + {KEY_EXCHANGE}")
+    logging.info(f"Starting QS-Radar-C2: {SIGALG} + {KEY_EXCHANGE}")
     app.run(host='0.0.0.0', port=8080)
