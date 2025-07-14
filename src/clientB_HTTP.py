@@ -16,13 +16,12 @@ CLIENT_B_KMS_BASE_URL = f"https://{CLIENT_B_KMS_HOST}:{CLIENT_B_KMS_PORT}/api/v1
 CLIENT_A_ID = "Alice254250"
 KEY_EXCHANGE = "BB84" # Options: BB84, ML_KEM-512, ML-KEM-768, ML-KEM-1024
 SIGALG = "ML-DSA-87"
-LOCAL_KEY = "<KEY>"
 
 logging.basicConfig(
     filename="logB.log",
     format="%(asctime)s.%(msecs)03d::%(levelname)s::%(message)s",
     datefmt="%Y-%m-%d %H:%M:%S",
-    level=logging.ERROR,
+    level=logging.DEBUG,
     filemode="x")
 
 def request_qkd_key_with_ID(key_ID: str) -> bytes:
@@ -81,8 +80,6 @@ def send_data(payload: bytes) -> None:
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     UDP_IP = "127.0.0.1"
     UDP_PORT = 56002
-
-    hash = hashlib.sha256(payload).hexdigest()
 
     sock.sendto(payload, (UDP_IP, UDP_PORT))
 

@@ -22,7 +22,7 @@ logging.basicConfig(
     filename="logA.log",
     format="%(asctime)s.%(msecs)03d::%(levelname)s::%(message)s",
     datefmt="%Y-%m-%d %H:%M:%S",
-    level=logging.ERROR,
+    level=logging.DEBUG,
     filemode="x")
 
 def request_qkd_key() -> tuple[str, bytes]:
