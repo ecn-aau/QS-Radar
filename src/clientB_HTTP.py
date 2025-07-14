@@ -7,7 +7,7 @@ import socket
 import oqs
 
 from Crypto.Cipher import AES
-from flask import Flask, request, jsonify, session
+from flask import Flask, request, jsonify
 
 
 CLIENT_B_KMS_HOST = "192.168.3.128" # Address of KMS, maybe there is only one
@@ -16,6 +16,7 @@ CLIENT_B_KMS_BASE_URL = f"https://{CLIENT_B_KMS_HOST}:{CLIENT_B_KMS_PORT}/api/v1
 CLIENT_A_ID = "Alice254250"
 KEY_EXCHANGE = "BB84" # Options: BB84, ML_KEM-512, ML-KEM-768, ML-KEM-1024
 SIGALG = "ML-DSA-87"
+LOCAL_KEY = "<KEY>"
 
 logging.basicConfig(
     filename="logB.log",
@@ -106,7 +107,7 @@ def get_public_key() -> bytes:
     return base64.b64decode(public_key)
 
 app = Flask(__name__)
-app.secret_key = "TEMPLATE_KEY"
+app.secret_key = bytearray(32) # WARNING: Not the intended use of this variable
 
 @app.route('/data', methods=['POST'])
 def handle_data():
@@ -127,7 +128,8 @@ def handle_data():
         if KEY_EXCHANGE == "BB84":
             key = request_qkd_key_with_ID(key_ID=payload['key_ID'])
         else:
-            key = session.pop('shared_secret')
+            key = app.secret_key
+            app.secret_key = bytearray(32)
         logging.debug(f"{KEY_EXCHANGE} key collected: ID {payload['key_ID']}")
 
         raw_data = decrypt_data(payload=payload, key=key)
@@ -157,7 +159,7 @@ def handle_kem():
         KEM_pb_key = base64.b64decode(payload['public_key'])
         ciphertext, shared_secret = server.encap_secret(KEM_pb_key)
 
-    session['shared_secret'] = shared_secret
+    app.secret_key = shared_secret
 
     return jsonify({'status': 'success', 'ciphertext': base64.b64encode(ciphertext).decode()}), 200
 
