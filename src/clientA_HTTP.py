@@ -92,7 +92,6 @@ def encrypt_data(data: bytes, key: bytes) -> object:
 
 def send_data(payload) -> None:
     try:
-        # hash = hashlib.sha256(json.dumps(payload).encode()).hexdigest() # (TODO: Unnecessary line?)
         response = requests.post(url="http://192.168.3.102:8080", json=payload, timeout=10)
         response.raise_for_status()
     except requests.exceptions.HTTPError as http_err:
@@ -150,9 +149,11 @@ if __name__ == "__main__":
             logging.info(f"Raw packet received: SHA-256 {hash}")
 
             if KEY_EXCHANGE == "BB84":
+                logging.debug("QKD key request initiated")
                 key_ID, key = request_qkd_key()
                 logging.debug(f"QKD key collected: ID {key_ID}")
             else:
+                logging.debug("PQC key request initiated")
                 key_ID, key = request_pqc_key()
                 logging.debug(f"PQC key collected: ID {key_ID}")
 
