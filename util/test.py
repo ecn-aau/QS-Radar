@@ -6,8 +6,8 @@ import numpy as np
 if __name__ == "__main__":
 
     # Path to your log file
-    logA_file_path = "../data/20km/ML-DSA-65/logA_fast.log"
-    logB_file_path = "../data/20km/ML-DSA-65/logB_fast.log"
+    logA_file_path = "../data/ML-KEM-1024/ML-DSA-87/logA.log"
+    logB_file_path = "../data/ML-KEM-1024/ML-DSA-87/logB.log"
 
     # Read the log file
     logA_lines = read_log_file(logA_file_path)
@@ -59,7 +59,7 @@ if __name__ == "__main__":
     parsed_logsB, num_errors_B_QKD = remove_error_blocks_between_patterns(
         full_logsB,
         "Encrypted and signed payload received",
-        "Raw packet forwarded",
+        "172.22.112.1",
         pattern_match_fn=log_contains_pattern,
         inclusive=True,
         error_filter_pattern="HTTP error occurred: 404 Client Error: Not Found for url: https://192.168.3.128:8200/")
@@ -126,14 +126,14 @@ if __name__ == "__main__":
         dtimes_rx_B = elapsed_time_between_patterns(
             logs=parsed_logsB,  # list of parsed logs
             start_pattern="Encrypted and signed payload received",
-            end_pattern="Raw packet forwarded",
+            end_pattern="172.22.112.1",
             use_regex=False
         )
     else:
         dtimes_rx_B = elapsed_time_between_patterns(
             logs=parsed_logsB,  # list of parsed logs
             start_pattern="Received KEM request",
-            end_pattern="Raw packet forwarded",
+            end_pattern="POST /data HTTP/1.1",
             use_regex=False
         )
     if dtimes_rx_B is None:
@@ -148,12 +148,6 @@ if __name__ == "__main__":
             logs=parsed_logsB,  # list of parsed logs
             start_pattern="Starting new HTTPS connection (1): 192.168.3.128",
             end_pattern="key collected",
-            use_regex=False
-        )
-        dtimes_encrypt_B = elapsed_time_between_patterns(
-            logs=parsed_logsB,  # list of parsed logs
-            start_pattern="key collected",
-            end_pattern="Decrypted data with key",
             use_regex=False
         )
     else:
@@ -197,6 +191,13 @@ if __name__ == "__main__":
         end_pattern="http://192.168.3.102:8080",
         use_regex=False
     )
+    # Correct for kem samples in log block (due to old logs not differentiating kem and data requests very well)
+    # Correct for RX processing in payload transmission time
+    if is_QKD:
+        dtimes_payload = [a - b for a, b in zip(dtimes_payload, dtimes_rx_B)]
+    else:
+        del dtimes_payload[::2]
+        dtimes_payload = [a - b + c for a, b, c in zip(dtimes_payload, dtimes_rx_B, dtimes_PQC_key_B)]
 
     # Calculated TX metrics
     # - Mean
