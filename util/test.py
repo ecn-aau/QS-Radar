@@ -6,8 +6,8 @@ import numpy as np
 if __name__ == "__main__":
 
     # Path to your log file
-    logA_file_path = "../data/20km/ML-DSA-44/logA.log"
-    logB_file_path = "../data/20km/ML-DSA-44/logB.log"
+    logA_file_path = "../data/20km/ML-DSA-65/logA_fast.log"
+    logB_file_path = "../data/20km/ML-DSA-65/logB_fast.log"
 
     # Read the log file
     logA_lines = read_log_file(logA_file_path)
@@ -16,6 +16,19 @@ if __name__ == "__main__":
     # Extract full logs
     full_logsA = extract_logs_by_level(logA_lines, ["INFO", "DEBUG", "ERROR"])
     full_logsB = extract_logs_by_level(logB_lines, ["INFO", "DEBUG", "ERROR"])
+
+    # Check whether PQC or QDK are used for key exchange
+    if (log_contains_pattern(full_logsA[0]['message'], "BB84") and
+        log_contains_pattern(full_logsB[0]['message'], "BB84")):
+        is_QKD = True
+    elif (log_contains_pattern(full_logsA[0]['message'], "QKD") and # Necessary condition for older logs that use "QKD"
+        log_contains_pattern(full_logsB[0]['message'], "QKD")):
+        is_QKD = True
+    elif (log_contains_pattern(full_logsA[0]['message'], "ML-KEM") and
+        log_contains_pattern(full_logsB[0]['message'], "ML-KEM")):
+        is_QKD = False
+    else:
+        raise KeyboardInterrupt("Terminating due to mismatching TX and RX log files.")
 
     # Parse known errors in TX
     # - RX errors on TX log
@@ -58,7 +71,7 @@ if __name__ == "__main__":
 
     # Check for error in the data
     if(contains_error_log(parsed_logsA) or contains_error_log(parsed_logsB)):
-        raise KeyboardInterrupt(f"Terminating test do to unexpected errors: Check log and add unknown errors to parsing.")
+        raise KeyboardInterrupt("Terminating test do to unexpected errors: Check log and add unknown errors to parsing.")
 
     # Collect time deltas between specific logs on TX
     dtimes_tx_A = elapsed_time_between_patterns(
@@ -69,21 +82,35 @@ if __name__ == "__main__":
     )
     if dtimes_tx_A is None:
         raise KeyboardInterrupt("Terminating: No data to work with in TX")
-    dtimes_crypto_A = elapsed_time_between_patterns(
-        logs=parsed_logsA,
-        start_pattern="Starting new HTTPS connection (1): 192.168.3.126",
-        end_pattern="Signed data with private key",
-        use_regex=False
-    )
-    dtimes_QKD_key_A = elapsed_time_between_patterns(
-        logs=parsed_logsA,  # list of parsed logs
-        start_pattern="Starting new HTTPS connection (1): 192.168.3.126",
-        end_pattern="QKD key collected",
-        use_regex=False
-    )
+    if is_QKD:
+        dtimes_crypto_A = elapsed_time_between_patterns(
+            logs=parsed_logsA,
+            start_pattern="Starting new HTTPS connection (1): 192.168.3.126",
+            end_pattern="Signed data with private key",
+            use_regex=False
+        )
+        dtimes_QKD_key_A = elapsed_time_between_patterns(
+            logs=parsed_logsA,  # list of parsed logs
+            start_pattern="Starting new HTTPS connection (1): 192.168.3.126",
+            end_pattern="key collected",
+            use_regex=False
+        )
+    else:
+        dtimes_crypto_A = elapsed_time_between_patterns(
+            logs=parsed_logsA,
+            start_pattern="PQC key request initiated",
+            end_pattern="Signed data with private key",
+            use_regex=False
+        )
+        dtimes_PQC_key_A = elapsed_time_between_patterns(
+            logs=parsed_logsA,  # list of parsed logs
+            start_pattern="PQC key request initiated",
+            end_pattern="key collected",
+            use_regex=False
+        )
     dtimes_encrypt_A = elapsed_time_between_patterns(
         logs=parsed_logsA,  # list of parsed logs
-        start_pattern="QKD key collected",
+        start_pattern="key collected",
         end_pattern="Encrypted data with key",
         use_regex=False
     )
@@ -95,28 +122,64 @@ if __name__ == "__main__":
     )
 
     # Collect time deltas between specific logs on RX
-    dtimes_rx_B = elapsed_time_between_patterns(
-        logs=parsed_logsB,  # list of parsed logs
-        start_pattern="Encrypted and signed payload received",
-        end_pattern="Raw packet forwarded",
-        use_regex=False
-    )
+    if is_QKD:
+        dtimes_rx_B = elapsed_time_between_patterns(
+            logs=parsed_logsB,  # list of parsed logs
+            start_pattern="Encrypted and signed payload received",
+            end_pattern="Raw packet forwarded",
+            use_regex=False
+        )
+    else:
+        dtimes_rx_B = elapsed_time_between_patterns(
+            logs=parsed_logsB,  # list of parsed logs
+            start_pattern="Received KEM request",
+            end_pattern="Raw packet forwarded",
+            use_regex=False
+        )
     if dtimes_rx_B is None:
         raise KeyboardInterrupt("Terminating: No data to work with in RX")
-    dtimes_crypto_B = elapsed_time_between_patterns(
-        logs=parsed_logsB,
-        start_pattern="Encrypted and signed payload received",
-        end_pattern="Decrypted data with key",
-    )
-    dtimes_QKD_key_B = elapsed_time_between_patterns(
-        logs=parsed_logsB,  # list of parsed logs
-        start_pattern="Starting new HTTPS connection (1): 192.168.3.128",
-        end_pattern="QKD key collected",
-        use_regex=False
-    )
+    if is_QKD:
+        dtimes_crypto_B = elapsed_time_between_patterns(
+            logs=parsed_logsB,
+            start_pattern="Encrypted and signed payload received",
+            end_pattern="Decrypted data with key",
+        )
+        dtimes_QKD_key_B = elapsed_time_between_patterns(
+            logs=parsed_logsB,  # list of parsed logs
+            start_pattern="Starting new HTTPS connection (1): 192.168.3.128",
+            end_pattern="key collected",
+            use_regex=False
+        )
+        dtimes_encrypt_B = elapsed_time_between_patterns(
+            logs=parsed_logsB,  # list of parsed logs
+            start_pattern="key collected",
+            end_pattern="Decrypted data with key",
+            use_regex=False
+        )
+    else:
+        dtimes_crypto_B = elapsed_time_between_patterns(
+            logs=parsed_logsB,
+            start_pattern="Received KEM request",
+            end_pattern="Decrypted data with key",
+        )
+        dtimes_PQC_key_B = elapsed_time_between_patterns(
+            logs=parsed_logsB,  # list of parsed logs
+            start_pattern="Received KEM request",
+            end_pattern="POST /kem HTTP/1.1",
+            use_regex=False
+        )
+        dtimes_idle_B = elapsed_time_between_patterns(
+            logs=parsed_logsB,
+            start_pattern="POST /kem HTTP/1.1",
+            end_pattern="Encrypted and signed payload received",
+            use_regex=False
+        )
+        # Correct for idle time between kem and data requests on RX
+        dtimes_rx_B = [a - b for a, b in zip(dtimes_rx_B, dtimes_idle_B)]
+        dtimes_crypto_B = [a - b for a, b in zip(dtimes_crypto_B, dtimes_idle_B)]
     dtimes_encrypt_B = elapsed_time_between_patterns(
         logs=parsed_logsB,  # list of parsed logs
-        start_pattern="QKD key collected",
+        start_pattern="key collected",
         end_pattern="Decrypted data with key",
         use_regex=False
     )
@@ -138,19 +201,28 @@ if __name__ == "__main__":
     # Calculated TX metrics
     # - Mean
     avg_time_tx_A = np.mean(dtimes_tx_A)
-    avg_time_QKD_key_A = np.mean(dtimes_QKD_key_A)
+    if is_QKD:
+        avg_time_QKD_key_A = np.mean(dtimes_QKD_key_A)
+    else:
+        avg_time_PQC_key_A = np.mean(dtimes_PQC_key_A)
     avg_time_encrypt_A = np.mean(dtimes_encrypt_A)
     avg_time_sign_A = np.mean(dtimes_sign_A)
     avg_time_crypto_A = np.mean(dtimes_crypto_A)
     # - Standard deviation
     std_time_tx_A = np.std(dtimes_tx_A)
-    std_time_QKD_key_A = np.std(dtimes_QKD_key_A)
+    if is_QKD:
+        std_time_QKD_key_A = np.std(dtimes_QKD_key_A)
+    else:
+        std_time_PQC_key_A = np.std(dtimes_PQC_key_A)
     std_time_encrypt_A = np.std(dtimes_encrypt_A)
     std_time_sign_A = np.std(dtimes_sign_A)
     std_time_crypto_A = np.std(dtimes_crypto_A)
     # - Max
     max_time_tx_A = np.max(dtimes_tx_A)
-    max_time_QKD_key_A = np.max(dtimes_QKD_key_A)
+    if is_QKD:
+        max_time_QKD_key_A = np.max(dtimes_QKD_key_A)
+    else:
+        max_time_PQC_key_A = np.max(dtimes_PQC_key_A)
     max_time_encrypt_A = np.max(dtimes_encrypt_A)
     max_time_sign_A = np.max(dtimes_sign_A)
     max_time_crypto_A = np.max(dtimes_crypto_A)
@@ -158,32 +230,43 @@ if __name__ == "__main__":
     # - Error rates
     err_rate_tx_A = (num_errors_A / (num_errors_A + len(dtimes_tx_A))) * 1000
     err_rate_QKD_key_A = (num_errors_A_QKD / (num_errors_A + len(dtimes_tx_A))) * 1000
+    err_rate_PQC_key_A = 0 # Placeholder
     err_rate_encrypt_A = 0 # Placeholder
     err_rate_sign_A = 0 # Placeholder
-    err_rate_crypto_A = err_rate_QKD_key_A + err_rate_encrypt_A + err_rate_sign_A
+    err_rate_crypto_A = err_rate_QKD_key_A + err_rate_PQC_key_A + err_rate_encrypt_A + err_rate_sign_A
 
     # Calculate RX metrics
     # - Mean
     avg_time_rx_B = np.mean(dtimes_rx_B)
-    avg_time_QKD_key_B = np.mean(dtimes_QKD_key_B)
+    if is_QKD:
+        avg_time_QKD_key_B = np.mean(dtimes_QKD_key_B)
+    else:
+        avg_time_PQC_key_B = np.mean(dtimes_PQC_key_B)
     avg_time_encrypt_B = np.mean(dtimes_encrypt_B)
     avg_time_sign_B = np.mean(dtimes_sign_B)
     avg_time_crypto_B = np.mean(dtimes_crypto_B)
     # - Standard deviation
     std_time_rx_B = np.std(dtimes_rx_B)
-    std_time_QKD_key_B = np.std(dtimes_QKD_key_B)
+    if is_QKD:
+        std_time_QKD_key_B = np.std(dtimes_QKD_key_B)
+    else:
+        std_time_PQC_key_B = np.std(dtimes_PQC_key_B)
     std_time_encrypt_B = np.std(dtimes_encrypt_B)
     std_time_sign_B = np.std(dtimes_sign_B)
     std_time_crypto_B = np.std(dtimes_crypto_B)
     # - Max
     max_time_rx_B = np.max(dtimes_rx_B)
-    max_time_QKD_key_B = np.max(dtimes_QKD_key_B)
+    if is_QKD:
+        max_time_QKD_key_B = np.max(dtimes_QKD_key_B)
+    else:
+        max_time_PQC_key_B = np.max(dtimes_PQC_key_B)
     max_time_encrypt_B = np.max(dtimes_encrypt_B)
     max_time_sign_B = np.max(dtimes_sign_B)
     max_time_crypto_B = np.max(dtimes_crypto_B)
     # - Error rates
     err_rate_rx_B = (num_errors_B / (num_errors_B + len(dtimes_rx_B))) * 1000
     err_rate_QKD_key_B = (num_errors_B_QKD / (num_errors_B + len(dtimes_rx_B))) * 1000
+    err_rate_PQC_key_B = 0 # Placeholder
     err_rate_encrypt_B = 0 # Placeholder
     err_rate_sign_B = 0 # Placeholder
     err_rate_crypto_B = err_rate_QKD_key_B + err_rate_encrypt_B + err_rate_sign_B
@@ -215,11 +298,18 @@ if __name__ == "__main__":
     print(f"-- Standard deviation: {std_time_crypto_A:.2f} ms")
     print(f"-- Max: {max_time_crypto_A:.0f} ms")
     print(f"-- Error rate: {err_rate_crypto_A:.2f} ‰")
-    print("- QKD key collection:")
-    print(f"-- Mean: {avg_time_QKD_key_A:.2f} ms")
-    print(f"-- Standard deviation: {std_time_QKD_key_A:.2f} ms")
-    print(f"-- Max: {max_time_QKD_key_A:.0f} ms")
-    print(f"-- Error rate: {err_rate_QKD_key_A:.2f} ‰")
+    if is_QKD:
+        print("- QKD key collection:")
+        print(f"-- Mean: {avg_time_QKD_key_A:.2f} ms")
+        print(f"-- Standard deviation: {std_time_QKD_key_A:.2f} ms")
+        print(f"-- Max: {max_time_QKD_key_A:.0f} ms")
+        print(f"-- Error rate: {err_rate_QKD_key_A:.2f} ‰")
+    else:
+        print("- PQC key collection:")
+        print(f"-- Mean: {avg_time_PQC_key_A:.2f} ms")
+        print(f"-- Standard deviation: {std_time_PQC_key_A:.2f} ms")
+        print(f"-- Max: {max_time_PQC_key_A:.0f} ms")
+        print(f"-- Error rate: {err_rate_PQC_key_A:.2f} ‰")
     print("- Encryption:")
     print(f"-- Mean: {avg_time_encrypt_A:.2f} ms")
     print(f"-- Standard deviation: {std_time_encrypt_A:.2f} ms")
@@ -243,11 +333,18 @@ if __name__ == "__main__":
     print(f"-- Standard deviation: {std_time_crypto_B:.2f} ms")
     print(f"-- Max: {max_time_crypto_B:.0f} ms")
     print(f"-- Error rate: {err_rate_crypto_B:.2f} ‰")
-    print("- QKD key collection:")
-    print(f"-- Mean: {avg_time_QKD_key_B:.2f} ms")
-    print(f"-- Standard deviation: {std_time_QKD_key_B:.2f} ms")
-    print(f"-- Max: {max_time_QKD_key_B:.0f} ms")
-    print(f"-- Error rate: {err_rate_QKD_key_B:.2f} ‰")
+    if is_QKD:
+        print("- QKD key collection:")
+        print(f"-- Mean: {avg_time_QKD_key_B:.2f} ms")
+        print(f"-- Standard deviation: {std_time_QKD_key_B:.2f} ms")
+        print(f"-- Max: {max_time_QKD_key_B:.0f} ms")
+        print(f"-- Error rate: {err_rate_QKD_key_B:.2f} ‰")
+    else:
+        print("- PQC key collection:")
+        print(f"-- Mean: {avg_time_PQC_key_B:.2f} ms")
+        print(f"-- Standard deviation: {std_time_PQC_key_B:.2f} ms")
+        print(f"-- Max: {max_time_PQC_key_B:.0f} ms")
+        print(f"-- Error rate: {err_rate_PQC_key_B:.2f} ‰")
     print("- Encryption:")
     print(f"-- Mean: {avg_time_encrypt_B:.2f} ms")
     print(f"-- Standard deviation: {std_time_encrypt_B:.2f} ms")
@@ -259,7 +356,7 @@ if __name__ == "__main__":
     print(f"-- Max: {max_time_sign_B:.0f} ms")
     print(f"-- Error rate: {err_rate_sign_B:.2f} ‰")
 
-    # Plot a histogram for the time deltas
+    # Plot a histogram for the time deltas of TX
     plot_time_deltas_bar(
         dtimes_tx_A,
         bin_size=10,
@@ -275,13 +372,22 @@ if __name__ == "__main__":
         show_overflow_bins=True,
         output_pdf_path="TX_crypto_processing_latency.pdf"
     )
-    plot_time_deltas_bar(
-        dtimes_QKD_key_A,
-        bin_size=10,
-        title="TX key exchange latency",
-        xlim_max=300,
-        show_overflow_bins=True,
-        output_pdf_path="TX_key_exchange_latency.pdf")
+    if is_QKD:
+        plot_time_deltas_bar(
+            dtimes_QKD_key_A,
+            bin_size=10,
+            title="TX key exchange latency",
+            xlim_max=300,
+            show_overflow_bins=True,
+            output_pdf_path="TX_key_exchange_latency.pdf")
+    else:
+        plot_time_deltas_bar(
+            dtimes_PQC_key_A,
+            bin_size=10,
+            title="TX key exchange latency",
+            xlim_max=300,
+            show_overflow_bins=True,
+            output_pdf_path="TX_key_exchange_latency.pdf")
     plot_time_deltas_bar(
         dtimes_encrypt_A,
         bin_size=10,
@@ -297,6 +403,7 @@ if __name__ == "__main__":
         show_overflow_bins=True,
         output_pdf_path="TX_signature_latency.pdf")
 
+    # Plot a histogram for the time deltas of RX
     plot_time_deltas_bar(
         dtimes_rx_B,
         bin_size=10,
@@ -312,13 +419,22 @@ if __name__ == "__main__":
         show_overflow_bins=True,
         output_pdf_path="RX_crypto_latency.pdf"
     )
-    plot_time_deltas_bar(
-        dtimes_QKD_key_B,
-        bin_size=10,
-        title="RX key exchange latency",
-        xlim_max=300,
-        show_overflow_bins=True,
-        output_pdf_path="RX_key exchange_latency.pdf")
+    if is_QKD:
+        plot_time_deltas_bar(
+            dtimes_QKD_key_B,
+            bin_size=10,
+            title="RX key exchange latency",
+            xlim_max=300,
+            show_overflow_bins=True,
+            output_pdf_path="RX_key_exchange_latency.pdf")
+    else:
+        plot_time_deltas_bar(
+            dtimes_PQC_key_B,
+            bin_size=10,
+            title="RX key exchange latency",
+            xlim_max=300,
+            show_overflow_bins=True,
+            output_pdf_path="RX_key_exchange_latency.pdf")
     plot_time_deltas_bar(
         dtimes_encrypt_B,
         bin_size=10,
