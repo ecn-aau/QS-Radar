@@ -49,10 +49,28 @@ if __name__ == "__main__":
         inclusive=True,
         error_filter_pattern="HTTP error occurred: 500 Server Error: Internal Server Error for url: https://192.168.3.126:8200/")
     print(f"Parsed {num_errors_A_QKD} errors in TX: QKD internal server error")
+    # - TX to RX timeout
+    parsed_logsA, num_errors_A_timeout = remove_error_blocks_between_patterns(
+        parsed_logsA,
+        "Raw packet received",
+        "Encrypted and signed payload forwarded",
+        pattern_match_fn=log_contains_pattern,
+        inclusive=True,
+        error_filter_pattern="Timeout error occurred: HTTPConnectionPool(host='192.168.3.102', port=8080): Read timed out")
+    print(f"Parsed {num_errors_A_timeout} errors in TX: RX timeout")
+    # - TX to RX max retries
+    parsed_logsA, num_errors_A_retries = remove_error_blocks_between_patterns(
+        parsed_logsA,
+        "Raw packet received",
+        "Encrypted and signed payload forwarded",
+        pattern_match_fn=log_contains_pattern,
+        inclusive=True,
+        error_filter_pattern="Connection error occurred: HTTPConnectionPool(host='192.168.3.102', port=8080): Max retries exceeded")
+    print(f"Parsed {num_errors_A_retries} errors in TX: RX max retries exceeded")
     # - Another error...TODO
 
-    # Total errors in TX (ignoring originating from RX)
-    num_errors_A = num_errors_A_QKD# + ...
+    # Total number of errors originating from TX
+    num_errors_A = num_errors_A_QKD + num_errors_A_timeout + num_errors_A_retries# + ...
 
     # Parse known errors in RX
     # - RX not finding QKD key on receiver
@@ -66,7 +84,7 @@ if __name__ == "__main__":
     print(f"Parsed {num_errors_B_QKD} errors in RX: QKD key not found")
     # - Another error...TODO
 
-    # Total number of errors in RX
+    # Total number of errors originating from RX
     num_errors_B = num_errors_B_QKD # + ...
 
     # Check for error in the data
@@ -371,8 +389,7 @@ if __name__ == "__main__":
         title="TX cryptography processing latency",
         xlim_max=300,
         show_overflow_bins=True,
-        output_pdf_path="TX_crypto_processing_latency.pdf"
-    )
+        output_pdf_path="TX_crypto_processing_latency.pdf")
     if is_QKD:
         plot_time_deltas_bar(
             dtimes_QKD_key_A,
