@@ -152,25 +152,54 @@ if __name__ == "__main__":
 
             try:
                 logging.debug("QKD key request initiated")
+                fallback = False
                 key_ID, key = request_qkd_key()
                 logging.debug(f"QKD key collected: size {KEY_LENGTH}, ID {key_ID}")
             except (requests.exceptions.HTTPError,
                     requests.exceptions.Timeout,
                     requests.exceptions.ConnectionError,
                     requests.exceptions.RequestException) as e:
-                logging.warning(f"QKD key request failed: {e}")
+                logging.warning(f"QKD key request failed")
                 logging.warning("Fallback PQC key request initiated")
+                fallback = True
                 key_ID, key = request_pqc_key()
                 logging.debug(f"PQC key collected: size 256, ID {key_ID}")
 
             encrypted_data = encrypt_data(data=data, key=key)
             encrypted_data["key_ID"] = key_ID
+            if fallback:
+                encrypted_data["fallback"] = True
+            else:
+                encrypted_data["fallback"] = False
             logging.debug(f"Encrypted data with key: ID {key_ID}")
 
             payload = sign_data(encrypted_data=encrypted_data, private_key=pv_key)
             logging.debug(f"Signed data with private key: {SIGALG}")
 
-            send_data(payload=payload)
+            try:
+                send_data(payload=payload)
+            except (requests.exceptions.HTTPError,
+                    requests.exceptions.Timeout,
+                    requests.exceptions.ConnectionError,
+                    requests.exceptions.RequestException) as e:
+                logging.warning("Receiver failed to acquire data")
+                if fallback:
+                    pass
+
+                logging.warning("Fallback PQC key request initiated")
+                key_ID, key = request_pqc_key()
+                logging.debug(f"PQC key collected: size 256, ID {key_ID}")
+
+                encrypted_data = encrypt_data(data=data, key=key)
+                encrypted_data["key_ID"] = key_ID
+                encrypted_data["fallback"] = True
+                logging.debug(f"Encrypted data with key: ID {key_ID}")
+
+                payload = sign_data(encrypted_data=encrypted_data, private_key=pv_key)
+                logging.debug(f"Signed data with private key: {SIGALG}")
+
+                send_data(payload=payload)
+
             print(f"Encrypted and signed payload forwarded: SHA-256 {hash}")
             logging.info(f"Encrypted and signed payload forwarded: SHA-256 {hash}")
         except Exception as e:
