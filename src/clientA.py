@@ -151,7 +151,7 @@ if __name__ == "__main__":
             if KEY_EXCHANGE == "BB84":
                 logging.debug("QKD key request initiated")
                 key_ID, key = request_qkd_key()
-                logging.debug(f"QKD key collected: ID {key_ID}")
+                logging.debug(f"QKD key collected: size {KEY_LENGTH}, ID {key_ID}")
             else:
                 logging.debug("PQC key request initiated")
                 key_ID, key = request_pqc_key()
