@@ -6,6 +6,8 @@ output*
 # out/*
 keys/*
 util/*.pdf
+util/*.png
+util/*.svg
 data/*
 
 # Byte-compiled / optimized / DLL files
