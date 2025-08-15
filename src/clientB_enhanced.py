@@ -15,7 +15,7 @@ CLIENT_B_KMS_PORT = "8200"
 CLIENT_B_KMS_BASE_URL = f"https://{CLIENT_B_KMS_HOST}:{CLIENT_B_KMS_PORT}/api/v1" # KMS cert might be self-signed?
 CLIENT_A_ID = "Alice254250"
 KEY_EXCHANGE = "BB84"
-KEY_EXCHANGE_BACKUP = "ML_KEM-1024"
+KEY_EXCHANGE_BACKUP = "ML-KEM-1024"
 SIGALG = "ML-DSA-87"
 
 logging.basicConfig(
@@ -42,7 +42,7 @@ def request_qkd_key_with_ID(key_ID: str) -> bytes:
             url = get_key_with_IDs_url,
             json = payload,
             verify = 'ca-cert.crt',
-            timeout = 0.1
+            timeout = 0.05
         )
         response.raise_for_status()
 
@@ -52,15 +52,19 @@ def request_qkd_key_with_ID(key_ID: str) -> bytes:
     except requests.exceptions.HTTPError as http_err:
         print(f"HTTP error occurred: {http_err} - Status Code: {response.status_code}")
         logging.error(f"HTTP error occurred: {http_err} - Status Code: {response.status_code}")
+        raise
     except requests.exceptions.ConnectionError as conn_err:
         print(f"Connection error occurred: {conn_err}")
         logging.error(f"Connection error occurred: {conn_err}")
+        raise
     except requests.exceptions.Timeout as timeout_err:
         print(f"Timeout error occurred: {timeout_err}")
         logging.error(f"Timeout error occurred: {timeout_err}")
+        raise
     except requests.exceptions.RequestException as err:
         print(f"Request failed: {err}")
         logging.error(f"Request failed: {err}")
+        raise
 
 
 def decrypt_data(payload: object, key: bytes) -> bytes:
@@ -93,6 +97,7 @@ def verify_signature(payload: object, public_key: bytes) -> bool:
         "ciphertext": payload["ciphertext"],
         "tag": payload["tag"],
         "key_ID": payload["key_ID"],
+        "fallback": payload["fallback"],
     }
     message = json.dumps(signed_data, sort_keys=True).encode()
 
@@ -136,8 +141,8 @@ def handle_data():
                     requests.exceptions.Timeout,
                     requests.exceptions.ConnectionError,
                     requests.exceptions.RequestException) as e:
-                logging.error(f"QKD key request failed: keyID {payload['key_ID']}")
-                return jsonify({'error': 'Invalid key'}), 400
+                logging.error(f"QKD key request failed: ID {payload['key_ID']}")
+                return jsonify({'error': 'Invalid key'}), 500
 
         raw_data = decrypt_data(payload=payload, key=key)
         logging.debug(f"Decrypted data with key: ID {payload['key_ID']}")
@@ -171,5 +176,5 @@ def handle_kem():
     return jsonify({'status': 'success', 'ciphertext': base64.b64encode(ciphertext).decode()}), 200
 
 if __name__ == '__main__':
-    logging.info(f"Starting QS-Radar-C2: {SIGALG} + {KEY_EXCHANGE}")
+    logging.info(f"Starting QS-Radar-C2: {SIGALG} + {KEY_EXCHANGE} (backup {KEY_EXCHANGE_BACKUP})")
     app.run(host='0.0.0.0', port=8080)

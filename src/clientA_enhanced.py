@@ -40,7 +40,7 @@ def request_qkd_key() -> tuple[str, bytes]:
             url = get_key_url,
             json = payload,
             verify = 'ca-cert.crt',
-            timeout = 0.1
+            timeout = 0.05
         )
         response.raise_for_status()
 
@@ -53,15 +53,19 @@ def request_qkd_key() -> tuple[str, bytes]:
     except requests.exceptions.HTTPError as http_err:
         print(f"HTTP error occurred: {http_err} - Status Code: {response.status_code}")
         logging.error(f"HTTP error occurred: {http_err} - Status Code: {response.status_code}")
+        raise
     except requests.exceptions.ConnectionError as conn_err:
         print(f"Connection error occurred: {conn_err}")
         logging.error(f"Connection error occurred: {conn_err}")
+        raise
     except requests.exceptions.Timeout as timeout_err:
         print(f"Timeout error occurred: {timeout_err}")
         logging.error(f"Timeout error occurred: {timeout_err}")
+        raise
     except requests.exceptions.RequestException as err:
         print(f"Request failed: {err}")
         logging.error(f"Request failed: {err}")
+        raise
 
 
 def request_pqc_key() -> tuple[str, bytes]:
@@ -73,7 +77,7 @@ def request_pqc_key() -> tuple[str, bytes]:
             "public_key": base64.b64encode(KEM_pb_key).decode(),
         }
 
-        response = requests.post(url="http://192.168.3.102:8080", json=payload, timeout=10)
+        response = requests.post(url="http://192.168.3.102:8080", json=payload, timeout=0.05)
         response.raise_for_status()
         shared_secret = client.decap_secret(base64.b64decode(response.json()['ciphertext']))
 
@@ -94,20 +98,24 @@ def encrypt_data(data: bytes, key: bytes) -> object:
 
 def send_data(payload) -> None:
     try:
-        response = requests.post(url="http://192.168.3.102:8080", json=payload, timeout=10)
+        response = requests.post(url="http://192.168.3.102:8080", json=payload, timeout=0.15)
         response.raise_for_status()
     except requests.exceptions.HTTPError as http_err:
         print(f"HTTP error occurred: {http_err} - Status Code: {response.status_code}")
         logging.error(f"HTTP error occurred: {http_err} - Status Code: {response.status_code}")
+        raise
     except requests.exceptions.ConnectionError as conn_err:
         print(f"Connection error occurred: {conn_err}")
         logging.error(f"Connection error occurred: {conn_err}")
+        raise
     except requests.exceptions.Timeout as timeout_err:
         print(f"Timeout error occurred: {timeout_err}")
         logging.error(f"Timeout error occurred: {timeout_err}")
+        raise
     except requests.exceptions.RequestException as req_err:
         print(f"Unexpected error: {req_err}")
         logging.error(f"Unexpected error: {req_err}")
+        raise
 
 def get_private_key() -> bytes:
     with open("../keys/ppk-"+SIGALG+".json", "r") as file:
@@ -183,8 +191,10 @@ if __name__ == "__main__":
                     requests.exceptions.ConnectionError,
                     requests.exceptions.RequestException) as e:
                 logging.warning("Receiver failed to acquire data")
+                logging.error(e)
                 if fallback:
-                    pass
+                    logging.warning("Skipping this payload due to error")
+                    continue
 
                 logging.warning("Fallback PQC key request initiated")
                 key_ID, key = request_pqc_key()
