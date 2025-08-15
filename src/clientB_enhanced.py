@@ -42,7 +42,7 @@ def request_qkd_key_with_ID(key_ID: str) -> bytes:
             url = get_key_with_IDs_url,
             json = payload,
             verify = 'ca-cert.crt',
-            timeout = 0.05
+            timeout = 0.05,
         )
         response.raise_for_status()
 
@@ -137,7 +137,7 @@ def handle_data():
             try:
                 key = request_qkd_key_with_ID(key_ID=payload['key_ID'])
                 logging.debug(f"{KEY_EXCHANGE} key collected: ID {payload['key_ID']}")
-            except(requests.exceptions.HTTPError,
+            except (requests.exceptions.HTTPError,
                     requests.exceptions.Timeout,
                     requests.exceptions.ConnectionError,
                     requests.exceptions.RequestException) as e:

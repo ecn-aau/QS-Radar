@@ -51,19 +51,15 @@ def request_qkd_key() -> tuple[str, bytes]:
         return (key_ID, key)
 
     except requests.exceptions.HTTPError as http_err:
-        print(f"HTTP error occurred: {http_err} - Status Code: {response.status_code}")
         logging.error(f"HTTP error occurred: {http_err} - Status Code: {response.status_code}")
         raise
     except requests.exceptions.ConnectionError as conn_err:
-        print(f"Connection error occurred: {conn_err}")
         logging.error(f"Connection error occurred: {conn_err}")
         raise
     except requests.exceptions.Timeout as timeout_err:
-        print(f"Timeout error occurred: {timeout_err}")
         logging.error(f"Timeout error occurred: {timeout_err}")
         raise
     except requests.exceptions.RequestException as err:
-        print(f"Request failed: {err}")
         logging.error(f"Request failed: {err}")
         raise
 
@@ -77,7 +73,7 @@ def request_pqc_key() -> tuple[str, bytes]:
             "public_key": base64.b64encode(KEM_pb_key).decode(),
         }
 
-        response = requests.post(url="http://192.168.3.102:8080", json=payload, timeout=0.05)
+        response = requests.post(url="http://192.168.3.102:8080/kem", json=payload, timeout=0.05)
         response.raise_for_status()
         shared_secret = client.decap_secret(base64.b64decode(response.json()['ciphertext']))
 
@@ -98,22 +94,18 @@ def encrypt_data(data: bytes, key: bytes) -> object:
 
 def send_data(payload) -> None:
     try:
-        response = requests.post(url="http://192.168.3.102:8080", json=payload, timeout=0.15)
+        response = requests.post(url="http://192.168.3.102:8080/data", json=payload, timeout=0.15)
         response.raise_for_status()
     except requests.exceptions.HTTPError as http_err:
-        print(f"HTTP error occurred: {http_err} - Status Code: {response.status_code}")
         logging.error(f"HTTP error occurred: {http_err} - Status Code: {response.status_code}")
         raise
     except requests.exceptions.ConnectionError as conn_err:
-        print(f"Connection error occurred: {conn_err}")
         logging.error(f"Connection error occurred: {conn_err}")
         raise
     except requests.exceptions.Timeout as timeout_err:
-        print(f"Timeout error occurred: {timeout_err}")
         logging.error(f"Timeout error occurred: {timeout_err}")
         raise
     except requests.exceptions.RequestException as req_err:
-        print(f"Unexpected error: {req_err}")
         logging.error(f"Unexpected error: {req_err}")
         raise
 
@@ -186,13 +178,15 @@ if __name__ == "__main__":
 
             try:
                 send_data(payload=payload)
+            except requests.exceptions.Timeout as e:
+                print("Warning: Receiver failed to acknowledge data")
+                logging.warning("Receiver failed to acknowledge data")
             except (requests.exceptions.HTTPError,
-                    requests.exceptions.Timeout,
                     requests.exceptions.ConnectionError,
                     requests.exceptions.RequestException) as e:
                 logging.warning("Receiver failed to acquire data")
-                logging.error(e)
                 if fallback:
+                    print("Skipping this payload due to error")
                     logging.warning("Skipping this payload due to error")
                     continue
 
@@ -214,6 +208,7 @@ if __name__ == "__main__":
             logging.info(f"Encrypted and signed payload forwarded: SHA-256 {hash}")
         except Exception as e:
             logging.error(e)
+            print("Skipping this payload due to error")
             logging.warning("Skipping this payload due to error")
             continue
 
