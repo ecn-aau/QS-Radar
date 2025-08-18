@@ -167,7 +167,7 @@ def handle_kem():
 
     logging.debug(f"Received ML-KEM request: ID {payload['key_ID']}")
 
-    with oqs.KeyEncapsulation(KEY_EXCHANGE) as server:
+    with oqs.KeyEncapsulation(KEY_EXCHANGE_BACKUP) as server:
         KEM_pb_key = base64.b64decode(payload['public_key'])
         ciphertext, shared_secret = server.encap_secret(KEM_pb_key)
 
