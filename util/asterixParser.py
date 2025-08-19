@@ -3,6 +3,8 @@ import matplotlib.pyplot as plt
 from datetime import datetime
 import numpy as np
 
+from dataPlotter import plot_time_deltas_ccdf
+
 dataItems = [["['010']", 0, 0],
              ["['015']", 0, 0],
              ["['070']", 0, 0],
@@ -156,6 +158,13 @@ def parse_file(name):
     values = ([item[2] for item in intervals])
     labels = createIntervalLabels()
     p2 = plotBarChart(labels, values, "", "Payload size", "Count")
+    p2_2 = plot_time_deltas_ccdf(
+        [x[1] for x in throughputBetweenTimestamps],
+        title="CCDF of ASTERIX payload sizes",
+        xlabel="Payload size (bytes)",
+        save_path="payload_size.pdf",
+        percentiles=[50,90,99],
+        log_y=True)
 
     p3 = plotFrequency(len(records_length))
 

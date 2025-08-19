@@ -376,104 +376,189 @@ if __name__ == "__main__":
     print(f"-- Error rate: {err_rate_sign_B:.2f} ‰")
 
     # Plot a histogram for the time deltas of TX
-    plot_time_deltas_bar(
+    # plot_time_deltas_bar(
+    #     dtimes_tx_A,
+    #     bin_size=10,
+    #     title="TX payload processing latency",
+    #     xlim_max=200,
+    #     show_overflow_bins=True,
+    #     output_pdf_path="TX_payload_processing_latency.pdf")
+    # plot_time_deltas_bar(
+    #     dtimes_crypto_A,
+    #     bin_size=10,
+    #     title="TX cryptography processing latency",
+    #     xlim_max=200,
+    #     show_overflow_bins=True,
+    #     output_pdf_path="TX_crypto_processing_latency.pdf")
+    # if is_QKD:
+    #     plot_time_deltas_bar(
+    #         dtimes_QKD_key_A,
+    #         bin_size=10,
+    #         title="TX key exchange latency",
+    #         xlim_max=200,
+    #         show_overflow_bins=True,
+    #         output_pdf_path="TX_key_exchange_latency.pdf")
+    # else:
+    #     plot_time_deltas_bar(
+    #         dtimes_PQC_key_A,
+    #         bin_size=10,
+    #         title="TX key exchange latency",
+    #         xlim_max=200,
+    #         show_overflow_bins=True,
+    #         output_pdf_path="TX_key_exchange_latency.pdf")
+    # plot_time_deltas_bar(
+    #     dtimes_encrypt_A,
+    #     bin_size=10,
+    #     title="TX encryption latency",
+    #     xlim_max=200,
+    #     show_overflow_bins=True,
+    #     output_pdf_path="TX_encryption_latency.pdf")
+    # plot_time_deltas_bar(
+    #     dtimes_sign_A,
+    #     bin_size=10,
+    #     title="TX digital signature latency",
+    #     xlim_max=200,
+    #     show_overflow_bins=True,
+    #     output_pdf_path="TX_signature_latency.pdf")
+    #
+    # # Plot a histogram for the time deltas of RX
+    # plot_time_deltas_bar(
+    #     dtimes_rx_B,
+    #     bin_size=10,
+    #     title="RX payload processing latency",
+    #     xlim_max=200,
+    #     show_overflow_bins=True,
+    #     output_pdf_path="RX_payload_processing_latency.pdf")
+    # plot_time_deltas_bar(
+    #     dtimes_crypto_B,
+    #     bin_size=10,
+    #     title="RX cryptography processing latency",
+    #     xlim_max=200,
+    #     show_overflow_bins=True,
+    #     output_pdf_path="RX_crypto_latency.pdf")
+    # if is_QKD:
+    #     plot_time_deltas_bar(
+    #         dtimes_QKD_key_B,
+    #         bin_size=10,
+    #         title="RX key exchange latency",
+    #         xlim_max=200,
+    #         show_overflow_bins=True,
+    #         output_pdf_path="RX_key_exchange_latency.pdf")
+    # else:
+    #     plot_time_deltas_bar(
+    #         dtimes_PQC_key_B,
+    #         bin_size=10,
+    #         title="RX key exchange latency",
+    #         xlim_max=200,
+    #         show_overflow_bins=True,
+    #         output_pdf_path="RX_key_exchange_latency.pdf")
+    # plot_time_deltas_bar(
+    #     dtimes_encrypt_B,
+    #     bin_size=10,
+    #     title="RX decryption latency",
+    #     xlim_max=200,
+    #     show_overflow_bins=True,
+    #     output_pdf_path="RX_encryption_latency.pdf")
+    # plot_time_deltas_bar(
+    #     dtimes_sign_B,
+    #     bin_size=10,
+    #     title="RX digital signature verification latency",
+    #     xlim_max=200,
+    #     show_overflow_bins=True,
+    #     output_pdf_path="RX_signature_latency.pdf")
+    #
+    # Plot a histogram for the time deltas of payload transmission
+    # plot_time_deltas_bar(
+    #     dtimes_payload,
+    #     bin_size=10,
+    #     title="Payload transmission latency",
+    #     xlim_max=200,
+    #     show_overflow_bins=True,
+    #     output_pdf_path="payload_transmission_latency.pdf")
+
+    plot_time_deltas_ccdf(
         dtimes_tx_A,
-        bin_size=10,
         title="TX payload processing latency",
-        xlim_max=300,
-        show_overflow_bins=True,
-        output_pdf_path="TX_payload_processing_latency.pdf")
-    plot_time_deltas_bar(
+        save_path="TX_payload_processing_latency.pdf",
+        percentiles=[99],
+        log_y=True)
+    plot_time_deltas_ccdf(
         dtimes_crypto_A,
-        bin_size=10,
         title="TX cryptography processing latency",
-        xlim_max=300,
-        show_overflow_bins=True,
-        output_pdf_path="TX_crypto_processing_latency.pdf")
+        save_path="TX_crypto_processing_latency.pdf",
+        percentiles=[99],
+        log_y=True)
     if is_QKD:
-        plot_time_deltas_bar(
+        plot_time_deltas_ccdf(
             dtimes_QKD_key_A,
-            bin_size=10,
             title="TX key exchange latency",
-            xlim_max=300,
-            show_overflow_bins=True,
-            output_pdf_path="TX_key_exchange_latency.pdf")
+            save_path="TX_key_exchange_latency.pdf",
+            percentiles=[99],
+            log_y=True)
     else:
-        plot_time_deltas_bar(
+        plot_time_deltas_ccdf(
             dtimes_PQC_key_A,
-            bin_size=10,
             title="TX key exchange latency",
-            xlim_max=300,
-            show_overflow_bins=True,
-            output_pdf_path="TX_key_exchange_latency.pdf")
-    plot_time_deltas_bar(
+            save_path="TX_key_exchange_latency.pdf",
+            percentiles=[99],
+            log_y=True)
+    plot_time_deltas_ccdf(
         dtimes_encrypt_A,
-        bin_size=10,
         title="TX encryption latency",
-        xlim_max=300,
-        show_overflow_bins=True,
-        output_pdf_path="TX_encryption_latency.pdf")
-    plot_time_deltas_bar(
+        save_path="TX_encryption_latency.pdf",
+        percentiles=[99],
+        log_y=True)
+    plot_time_deltas_ccdf(
         dtimes_sign_A,
-        bin_size=10,
         title="TX digital signature latency",
-        xlim_max=300,
-        show_overflow_bins=True,
-        output_pdf_path="TX_signature_latency.pdf")
+        save_path="TX_signature_latency.pdf",
+        percentiles=[99],
+        log_y=True)
 
-    # Plot a histogram for the time deltas of RX
-    plot_time_deltas_bar(
+    # Plot CDFs for the time deltas of RX
+    plot_time_deltas_ccdf(
         dtimes_rx_B,
-        bin_size=10,
         title="RX payload processing latency",
-        xlim_max=300,
-        show_overflow_bins=True,
-        output_pdf_path="RX_payload_processing_latency.pdf")
-    plot_time_deltas_bar(
+        save_path="RX_payload_processing_latency.pdf",
+        percentiles=[99],
+        log_y=True)
+    plot_time_deltas_ccdf(
         dtimes_crypto_B,
-        bin_size=10,
         title="RX cryptography processing latency",
-        xlim_max=300,
-        show_overflow_bins=True,
-        output_pdf_path="RX_crypto_latency.pdf"
-    )
+        save_path="RX_crypto_latency.pdf",
+        percentiles=[99],
+        log_y=True)
     if is_QKD:
-        plot_time_deltas_bar(
+        plot_time_deltas_ccdf(
             dtimes_QKD_key_B,
-            bin_size=10,
             title="RX key exchange latency",
-            xlim_max=300,
-            show_overflow_bins=True,
-            output_pdf_path="RX_key_exchange_latency.pdf")
+            save_path="RX_key_exchange_latency.pdf",
+            percentiles=[99],
+            log_y=True)
     else:
-        plot_time_deltas_bar(
+        plot_time_deltas_ccdf(
             dtimes_PQC_key_B,
-            bin_size=10,
             title="RX key exchange latency",
-            xlim_max=300,
-            show_overflow_bins=True,
-            output_pdf_path="RX_key_exchange_latency.pdf")
-    plot_time_deltas_bar(
+            save_path="RX_key_exchange_latency.pdf",
+            percentiles=[99],
+            log_y=True)
+    plot_time_deltas_ccdf(
         dtimes_encrypt_B,
-        bin_size=10,
         title="RX decryption latency",
-        xlim_max=300,
-        show_overflow_bins=True,
-        output_pdf_path="RX_encryption_latency.pdf")
-    plot_time_deltas_bar(
+        save_path="RX_encryption_latency.pdf",
+        percentiles=[99],
+        log_y=True)
+    plot_time_deltas_ccdf(
         dtimes_sign_B,
-        bin_size=10,
         title="RX digital signature verification latency",
-        xlim_max=300,
-        show_overflow_bins=True,
-        output_pdf_path="RX_signature_latency.pdf")
+        save_path="RX_signature_latency.pdf",
+        percentiles=[99],
+        log_y=True)
 
-    plot_time_deltas_bar(
+    # Plot CDF for the time deltas of payload transmission
+    plot_time_deltas_ccdf(
         dtimes_payload,
-        bin_size=10,
         title="Payload transmission latency",
-        xlim_max=300,
-        show_overflow_bins=True,
-        output_pdf_path="payload_transmission_latency.pdf"
-    )
-
+        save_path="payload_transmission_latency.pdf",
+        percentiles=[99],
+        log_y=True)

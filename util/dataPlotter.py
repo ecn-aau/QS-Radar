@@ -76,12 +76,12 @@ def plot_time_deltas_bar(
         overflow_x = x_positions[-1] + bin_size if x_positions else 0
         x_positions.append(overflow_x)
 
-    plt.figure(figsize=(12, 6))
+    plt.figure(figsize=(6, 6))
     plt.bar(x_positions, y_counts, color=colors, edgecolor='black', width=bin_size * 0.9)
-    plt.xticks(x_positions, x_labels, rotation=45, ha='right')
+    plt.xticks(x_positions, x_labels, rotation=45, ha='right', fontsize=10)
     # plt.xlabel("Time Delta Bins (ms)")
-    plt.ylabel("Count")
-    plt.title(title)
+    plt.ylabel("Count", fontsize=10)
+    # plt.title(title)
     plt.grid(axis='y', linestyle='--', alpha=0.5)
 
     plt.axvline(x=mean_val, color='red', linestyle='--', linewidth=1.5)
@@ -93,6 +93,7 @@ def plot_time_deltas_bar(
         fontsize=10,
         ha='left',
         va='top',
+        fontweight='bold',
         # rotation=90,
         # backgroundcolor='white'
     )
@@ -101,10 +102,10 @@ def plot_time_deltas_bar(
         plt.text(
             overflow_x,
             y_counts[-1] + max(y_counts) * 0.02,
-            f"Max: {max_val:.0f} ms",
+            f"Max:\n{max_val:.0f} ms",
             ha='center',
             va='bottom',
-            fontsize=9,
+            fontsize=10,
             color='blue',
             fontweight='bold'
         )
@@ -117,3 +118,103 @@ def plot_time_deltas_bar(
 
     plt.show()
 
+def plot_time_deltas_ccdf(
+    latencies: List[float],
+    title: str = "Latency CCDF",
+    xlabel: str = "Latency (ms)",
+    ylabel: str = "CCDF",
+    save_path: Optional[str] = None,
+    percentiles: Optional[List[int]] = None,
+    log_y: bool = False,
+    show_max: bool = True,
+    x_offset_fraction: float = 5*10**-3,   # fraction of x-axis range for label offset
+    y_offset_fraction: float = 8*10**-6    # fraction of y-axis range for label offset
+):
+    """
+    Plots the Complementary Cumulative Distribution Function (CCDF)
+    of an array of latencies in milliseconds.
+
+    Args:
+        latencies (List[float]): A list of latency values in milliseconds.
+        title (str): Title of the plot.
+        xlabel (str): Label for the x-axis.
+        ylabel (str): Label for the y-axis.
+        save_path (Optional[str]): If provided, saves the figure as a PDF to this path.
+        percentiles (Optional[List[int]]): List of percentiles to mark on the CCDF (e.g., [50, 90, 99]).
+        log_y (bool): If True, the Y-axis is logarithmic (final CCDF=0 replaced by 1/N).
+        show_max (bool): If True, annotate the maximum latency value on the plot.
+        x_offset_fraction (float): Fraction of x-axis span to shift labels horizontally.
+        y_offset_fraction (float): Fraction of y-axis span to shift labels vertically.
+    """
+    if not latencies:
+        print("No data to plot.")
+        return
+
+    # Sort latencies
+    data = np.sort(latencies)
+    N = len(data)
+
+    # Compute cumulative probabilities
+    cdf = np.arange(1, N + 1) / N
+    ccdf = 1 - cdf
+
+    # Fix log-scale issue: replace final 0 with 1/N
+    if log_y:
+        ccdf[-1] = 1.0 / N
+
+    # Plot CCDF as black line with blue sample points
+    plt.figure(figsize=(7, 6))
+    plt.plot(data, ccdf, linestyle='-', color='black')   # line
+    plt.scatter(data, ccdf, color='blue', s=15, rasterized=True)          # points
+
+    # Fix Y-axis before annotations
+    if log_y:
+        plt.yscale("log")
+        plt.ylim(1.0 / (N * 2), 1)   # slightly below lowest point
+    else:
+        plt.ylim(0, 1)
+
+    # Get axis ranges for scaling
+    xmin, xmax = plt.xlim()
+    ymin, ymax = plt.ylim()
+
+    # Compute scaled offsets
+    x_offset = (xmax - xmin) * x_offset_fraction
+    y_offset = (ymax - ymin) * y_offset_fraction
+
+    # Add percentile markers if provided
+    if percentiles:
+        for p in percentiles:
+            if 0 <= p <= 100:
+                value = np.percentile(data, p)
+                plt.axvline(value, color='red', linestyle='--', alpha=0.7)
+                plt.text(value + x_offset, ymin + y_offset,
+                         f"p{p} = {value:.2f} ms",
+                         # f"p{p} = {value:.0f} bytes",
+                         rotation=90, verticalalignment='bottom',
+                         color='red', fontweight='bold', fontsize=10)
+
+    # Annotate maximum latency
+    if show_max:
+        max_val = np.max(data)
+        plt.axvline(max_val, color='red', linestyle='--', alpha=0.7)
+        plt.text(max_val + x_offset, ymin + y_offset,
+                 f"max = {max_val:.2f} ms",
+                 # f"max = {max_val:.0f} bytes",
+                 rotation=90, verticalalignment='bottom',
+                 color='red', fontweight='bold', fontsize=10)
+
+    # Labels and styling
+    plt.xlabel(xlabel)
+    plt.ylabel(ylabel)
+    # plt.title(title)
+    plt.grid(True, linestyle='--', alpha=0.6)
+
+    plt.tight_layout()
+
+    # Save or show
+    if save_path:
+        plt.savefig(save_path, format="pdf")
+        print(f"CCDF plot saved to {save_path}")
+
+    plt.show()
