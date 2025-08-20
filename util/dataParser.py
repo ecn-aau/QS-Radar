@@ -74,7 +74,9 @@ def elapsed_time_between_patterns(
     logs: List[Dict[str, str]],
     start_pattern: str,
     end_pattern: str,
-    use_regex: bool = False
+    use_regex: bool = False,
+    condition_pattern: Optional[str] = None,
+    abort_pattern: Optional[str] = None
 ) -> Optional[list]:
     """
     Calculate the mean elapsed time in milliseconds between logs matching two patterns.
@@ -84,6 +86,8 @@ def elapsed_time_between_patterns(
         start_pattern (str): Pattern to detect the start log.
         end_pattern (str): Pattern to detect the end log.
         use_regex (bool): Whether to interpret patterns as regular expressions.
+        condition_pattern (Optional[str]): If provided, checks if condition pattern is between start and end logs.
+        abort_pattern (Optional[str]): If provided, looks for new start if pattern is found before end log.
 
     Returns:
         Optional[float]: Average elapsed time in milliseconds, or None if no valid pairs found.
@@ -91,6 +95,7 @@ def elapsed_time_between_patterns(
     time_deltas = []
     waiting_for_end = False
     start_time = None
+    contains_condition = False
 
     for log in logs:
         message = log["message"]
@@ -100,11 +105,22 @@ def elapsed_time_between_patterns(
             start_time = datetime.strptime(log["timestamp"], "%Y-%m-%d %H:%M:%S.%f")
             waiting_for_end = True
 
-        elif waiting_for_end and log_contains_pattern(message, end_pattern, use_regex):
+        if condition_pattern is not None and waiting_for_end:
+            if log_contains_pattern(message, condition_pattern, use_regex):
+                contains_condition = True
+
+        if abort_pattern is not None and waiting_for_end:
+            if log_contains_pattern(message, abort_pattern, use_regex):
+                waiting_for_end = False
+                contains_condition = False
+
+        if waiting_for_end and log_contains_pattern(message, end_pattern, use_regex):
             # Found an end pattern after a start
-            end_time = datetime.strptime(log["timestamp"], "%Y-%m-%d %H:%M:%S.%f")
-            delta_ms = (end_time - start_time).total_seconds() * 1000  # Convert to ms
-            time_deltas.append(delta_ms)
+            if condition_pattern is None or contains_condition is True:
+                end_time = datetime.strptime(log["timestamp"], "%Y-%m-%d %H:%M:%S.%f")
+                delta_ms = (end_time - start_time).total_seconds() * 1000  # Convert to ms
+                time_deltas.append(delta_ms)
+                contains_condition = False
             waiting_for_end = False
             start_time = None
 
