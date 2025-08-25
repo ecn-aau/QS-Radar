@@ -5,6 +5,8 @@ import numpy as np
 
 if __name__ == "__main__":
 
+    num_samples = 10**5
+
     # Path to your log file
     logA_file_path = "../data/hybrid/ML-DSA-87/logA.log"
     logB_file_path = "../data/hybrid/ML-DSA-87/logB.log"
@@ -66,25 +68,34 @@ if __name__ == "__main__":
     # - Another error...TODO
 
     # Parse and count known critical errors in TX
-    parsed_logsA = full_logsA
+    # - RX failed to answer PQC request (max retries)
+    parsed_logsA, num_errors_A_PQC = remove_error_blocks_between_patterns(
+        full_logsA,
+        "Raw packet received",
+        "Encrypted and signed payload forwarded",
+        pattern_match_fn=log_contains_pattern,
+        inclusive=True,
+        error_filter_pattern="""HTTPConnectionPool(host='192.168.3.102', port=8080): Max retries exceeded with url: /kem""")
+    print(f"Parsed {num_errors_A_PQC} errors in TX: PQC max retries")
     # - Another error...TODO
 
     # Total number of errors originating from TX
     num_errors_A_QKD = num_errors_A_QKDtimeout + num_errors_A_QKDretries
     num_errors_A_data = num_errors_A_retries + num_errors_A_timeout
     num_errors_A = num_errors_A_QKD + num_errors_A_data# + ...
-    num_errors_A_fatal = 0 # Placeholder
+    num_errors_A_fatal = num_errors_A_PQC# + ...
+    num_errors_A_total = num_errors_A + num_errors_A_fatal
 
     # Parse and count known errors in RX
-    # - RX failed to get QKD key (timeout)
+    # - RX failed to get QKD key
     parsed_logsB, num_errors_B_QKD = remove_error_blocks_between_patterns(
         full_logsB,
         "Encrypted and signed payload received",
         "172.22.112.1",
         pattern_match_fn=log_contains_pattern,
         inclusive=True,
-        error_filter_pattern="""Connection error occurred: HTTPSConnectionPool(host='192.168.3.128'""")
-    print(f"Parsed {num_errors_B_QKD} errors in RX: QKD timeout")
+        error_filter_pattern="QKD key request failed")
+    print(f"Parsed {num_errors_B_QKD} errors in RX: QKD error")
     # - Another error...TODO
 
     # Total number of errors originating from RX
@@ -92,7 +103,7 @@ if __name__ == "__main__":
     num_errors_B_fatal = 0 # Placeholder
 
     # Check for error in the data
-    if(contains_error_log(test_logsA) or contains_error_log(parsed_logsB)):
+    if(contains_error_log(test_logsA)):# or contains_error_log(parsed_logsB)):
         raise KeyboardInterrupt("Terminating test do to unexpected errors: Check log and add unknown errors to parsing.")
 
     # Collect time deltas between specific logs on TX
@@ -225,10 +236,10 @@ if __name__ == "__main__":
     max_time_crypto_A = np.max(dtimes_crypto_A)
 
     # - Error rates
-    err_rate_tx_A_fatal = (num_errors_A_fatal / num_errors_A) * 1000
-    err_rate_tx_A = (num_errors_A / (num_errors_A + len(dtimes_tx_A))) * 1000
-    err_rate_QKD_key_A = (num_errors_A_QKD / (num_errors_A + len(dtimes_tx_A))) * 1000
-    err_rate_PQC_key_A = 0 # Placeholder
+    err_rate_tx_A_fatal = (num_errors_A_fatal / num_samples) * 1000
+    err_rate_tx_A = (num_errors_A / num_samples) * 1000
+    err_rate_QKD_key_A = (num_errors_A_QKD / num_samples) * 1000
+    err_rate_PQC_key_A = (num_errors_A_PQC / num_samples) * 1000
     err_rate_encrypt_A = 0 # Placeholder
     err_rate_sign_A = 0 # Placeholder
     err_rate_crypto_A = err_rate_QKD_key_A + err_rate_PQC_key_A + err_rate_encrypt_A + err_rate_sign_A
@@ -347,6 +358,18 @@ if __name__ == "__main__":
     print(f"-- Max: {max_time_sign_B:.0f} ms")
     print(f"-- Error rate: {err_rate_sign_B:.2f} ‰")
 
+    from test_alt import dtimes_tx_A as ML_KEM_768_deltas
+    from test_alt_2 import dtimes_tx_A as BB84_deltas
+
+    plot_time_deltas_ccdf_multi(
+        [dtimes_tx_A, BB84_deltas, ML_KEM_768_deltas],
+        labels=["Hybrid BB84 + ML-KEM-1024 (enhanced)","BB84","ML-KEM-768 (previous best)"],
+        labels_short=["Hybrid","BB84","ML-KEM-768"],
+        save_path="Latency_comparison.pdf",
+        percentiles=[99],
+        log_y=True
+    )
+
     plot_time_deltas_ccdf(
         dtimes_tx_A,
         title="TX payload processing latency",
@@ -361,14 +384,14 @@ if __name__ == "__main__":
         log_y=True)
     plot_time_deltas_ccdf(
         dtimes_QKD_key_A,
-        title="TX key exchange latency",
-        save_path="TX_key_exchange_latency.pdf",
+        title="TX QKD key exchange latency",
+        save_path="TX_QKD_key_exchange_latency.pdf",
         percentiles=[99],
         log_y=True)
     plot_time_deltas_ccdf(
         dtimes_PQC_key_A,
-        title="TX key exchange latency",
-        save_path="TX_key_exchange_latency.pdf",
+        title="TX PQC key exchange latency",
+        save_path="TX_PQC_key_exchange_latency.pdf",
         percentiles=[99],
         log_y=True)
     plot_time_deltas_ccdf(
@@ -399,14 +422,14 @@ if __name__ == "__main__":
         log_y=True)
     plot_time_deltas_ccdf(
         dtimes_QKD_key_B,
-        title="RX key exchange latency",
-        save_path="RX_key_exchange_latency.pdf",
+        title="RX QKD key exchange latency",
+        save_path="RX_QKD_key_exchange_latency.pdf",
         percentiles=[99],
         log_y=True)
     plot_time_deltas_ccdf(
         dtimes_PQC_key_B,
-        title="RX key exchange latency",
-        save_path="RX_key_exchange_latency.pdf",
+        title="RX PQC key exchange latency",
+        save_path="RX_PQC_key_exchange_latency.pdf",
         percentiles=[99],
         log_y=True)
     plot_time_deltas_ccdf(
