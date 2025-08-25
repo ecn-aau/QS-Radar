@@ -118,6 +118,7 @@ def plot_time_deltas_bar(
 
     plt.show()
 
+
 def plot_time_deltas_ccdf(
     latencies: List[float],
     title: str = "Latency CCDF",
@@ -217,4 +218,144 @@ def plot_time_deltas_ccdf(
         plt.savefig(save_path, format="pdf")
         print(f"CCDF plot saved to {save_path}")
 
+    plt.show()
+
+
+def plot_time_deltas_ccdf_multi(
+    datasets: List[List[float]],
+    labels: Optional[List[str]] = None,
+    labels_short: Optional[List[str]] = None,
+    # title: str = "Latency CCDF Comparison",
+    xlabel: str = "Latency (ms)",
+    ylabel: str = "CCDF",
+    save_path: Optional[str] = None,
+    percentiles: Optional[List[int]] = None,
+    log_y: bool = False,
+    show_max: bool = True,
+    x_offset_fraction: float = 5*10**-3,  # fraction of x-axis range for label offset
+    y_offset_fraction: float = 1*10**-6,  # fraction of y-axis range for label offset
+    rasterize_points: bool = True,
+    colors: Optional[List[str]] = None,
+):
+    """
+    Plots the Complementary Cumulative Distribution Function (CCDF)
+    for multiple datasets of latencies in milliseconds.
+
+    Args:
+        datasets (List[List[float]]): List of latency datasets (each a list of floats).
+        labels (Optional[List[str]]): Labels for datasets (defaults to Dataset 1, Dataset 2, ...).
+        title (str): Plot title.
+        xlabel (str): Label for x-axis.
+        ylabel (str): Label for y-axis.
+        save_path (Optional[str]): If provided, saves figure as PDF.
+        percentiles (Optional[List[int]]): Percentiles to mark for each dataset.
+        log_y (bool): If True, Y-axis is logarithmic.
+        show_max (bool): If True, annotate maximum value per dataset.
+        x_offset_fraction (float): Horizontal offset fraction for annotation text.
+        y_offset_fraction (float): Vertical offset fraction for annotation text.
+        rasterize_points (bool): Rasterize scatter points for lighter PDFs.
+        colors (Optional[List[str]]): Custom colors for datasets.
+    """
+
+    def compute_ccdf(data, log_y):
+        """Helper to compute CCDF values for a sorted dataset."""
+        N = len(data)
+        cdf = np.arange(1, N + 1) / N
+        ccdf = 1 - cdf
+        if log_y:
+            ccdf[-1] = 1.0 / N  # replace final zero
+        return ccdf
+
+    if not datasets or all(len(d) == 0 for d in datasets):
+        print("No data provided for plotting.")
+        return
+
+    num_sets = len(datasets)
+    if not labels:
+        labels = [f"Dataset {i+1}" for i in range(num_sets)]
+    if not labels_short:
+        labels_short = labels
+
+    if not colors:
+        # Default color cycle (black line + colored points)
+        base_colors = ["blue", "green", "red", "purple", "orange", "brown", "pink", "gray"]
+        colors = base_colors[:num_sets]
+
+    plt.figure(figsize=(14, 6))
+
+    # Track axis limits for annotations
+    ymin, ymax = (None, None)
+    xmin, xmax = (None, None)
+
+    for i, (data, label, color) in enumerate(zip(datasets, labels, colors)):
+        if not data:
+            continue
+
+        # Sort & compute CCDF
+        data_sorted = np.sort(data)
+        ccdf = compute_ccdf(data_sorted, log_y)
+
+        # Plot line + scatter
+        plt.plot(data_sorted, ccdf, linestyle='-', color='black', linewidth=0.8)
+        plt.scatter(data_sorted, ccdf, color=color, s=12, rasterized=rasterize_points, label=label)
+
+        # Update axis ranges
+        if xmin is None:
+            xmin, xmax = np.min(data_sorted), np.max(data_sorted)
+            ymin, ymax = np.min(ccdf), np.max(ccdf)
+        else:
+            xmin, xmax = min(xmin, np.min(data_sorted)), max(xmax, np.max(data_sorted))
+            ymin, ymax = min(ymin, np.min(ccdf)), max(ymax, np.max(ccdf))
+
+    # Apply log scale if requested
+    if log_y:
+        ymin = min(1.0 / (max(len(d) for d in datasets) * 10), ymin)
+        plt.yscale("log")
+        plt.ylim(ymin, 1)
+    else:
+        plt.ylim(0, 1)
+
+    # Axis ranges for annotation offsets
+    xmin, xmax = plt.xlim()
+    ymin, ymax = plt.ylim()
+    x_offset = (xmax - xmin) * x_offset_fraction
+    y_offset = (ymax - ymin) * y_offset_fraction
+
+    # Percentile annotations
+    if percentiles:
+        for data, label, color in zip(datasets, labels_short, colors):
+            if not data:
+                continue
+            for p in percentiles:
+                if 0 <= p <= 100:
+                    value = np.percentile(data, p)
+                    plt.axvline(value, color=color, linestyle='--', alpha=0.6)
+                    plt.text(value + x_offset, ymin + y_offset,
+                             f"{label} p{p} = {value:.2f} ms",
+                             rotation=90, verticalalignment='bottom',
+                             color=color, fontweight='bold', fontsize=10)
+
+    # Max annotations
+    if show_max:
+        for data, label, color in zip(datasets, labels_short, colors):
+            if not data:
+                continue
+            max_val = np.max(data)
+            plt.axvline(max_val, color=color, linestyle='--', alpha=0.7)
+            plt.text(max_val + x_offset, ymin + y_offset,
+                     f"{label} max = {max_val:.2f} ms",
+                     rotation=90, verticalalignment='bottom',
+                     color=color, fontweight='bold', fontsize=10)
+
+    # Labels & layout
+    plt.xlabel(xlabel)
+    plt.ylabel(ylabel)
+    # plt.title(title)
+    plt.grid(True, linestyle='--', alpha=0.6)
+    plt.legend()
+    plt.tight_layout()
+
+    if save_path:
+        plt.savefig(save_path, format="pdf")
+        print(f"Multi-dataset CCDF plot saved to {save_path}")
     plt.show()
