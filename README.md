@@ -49,7 +49,7 @@ Additionally, `ast-tool-py` is installed and run in parallel to the apps to simu
 
 On each endpoint, run `clientA_HTTP` and `clientB_HTTP`, respectively. Moreover, run the following commands in parallel on endpoints A and B, respectively:
 ```
-ast-tool-py --empty-selection --cat 62 1.20 random --sleep 2 | ast-tool-py to-udp --unicast "*" <DESTINATION_IP> <DESTINATION_PORT>
+ast-tool-py --empty-selection --cat 62 1.20 random --sleep 1 | ast-tool-py to-udp --unicast "*" <DESTINATION_IP> <DESTINATION_PORT>
 ast-tool-py from-udp --unicast "ch1" <LISTENING_IP> <LISTENING_PORT> | ast-tool-py decode
 ```
 
@@ -58,4 +58,4 @@ By default, the applications on endpoint A receives the data from the radar simu
 ## Acknowledgment
 
 Thank you to Martón Reiter for establishing the initial experimental setup during his MSc thesis:
-M. Reiter, "Thesis title (placeholder)," *Aalborg University*, Denmark, 2025.
+M. Reiter, "Design and Implementation of a Testbed Setup for Evaluating PQC and QKD Integration in Critical Infrastructure Environments," *Aalborg University*, Denmark, 2025.
