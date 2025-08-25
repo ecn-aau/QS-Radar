@@ -6,17 +6,31 @@ Scripts to run an experimental Quantum Safe (QS) Radar communication between two
 
 Two scripts, one for each endpoint, run a web application that uses UDP over HTTP to transfer data between each other. Endpoint A is the transmitter (the Radar), while endpoint B is the receiver (the Command-and-Control center). The applications pull keys using the ETSI014 standard for requesting symmetric cryptographic keys from Quantum Key Distribution (QKD) systems. Alternatively, they can use NIST standards for Post-Quantum Cryptography (PQC) for key exchange, namely, ML-KEM-512/768/1024. The applications also use NIST standards for PQC for signing encrypted data, namely, ML-DSA-44/65/87. The endpoints simulate radar data following the ASTERIX protocol (cat 062).
 
-A basic data transfer is as follows:
+A basic data transfer using QKD is as follows:
 1. Endpoint A simulates a radar track.
 2. The app on endpoint A receives the track payload.
 3. The app on endpoint A pulls a cryptographic key using ETSI014 and encrypts the payload.
-4. The app on endpoint A signs with a PQC standard the encrypted message.
-5. The app on endpoint A transmits the signed encrypted message to the app on endpoint B.
-6. The app on endpoint B receives the signed encrypted message.
-7. The app on endpoint B checks the signature using the public key.
-8. The app on endpoint B pulls the same cryptographic key (based on key ID) using ETSI014 and decrypts the payload.
-9. The app on endpoint B forwards the radar payload to the radar simulator.
-10. Endpoint B shows the radar track.
+4. The app on endpoint A encrypts the payload using the pulled key.
+5. The app on endpoint A signs with a PQC standard the encrypted message.
+6. The app on endpoint A transmits the signed encrypted message to the app on endpoint B.
+7. The app on endpoint B receives the signed encrypted message.
+8. The app on endpoint B checks the signature using the public key.
+9. The app on endpoint B pulls the same cryptographic key (based on key ID) using ETSI014 and decrypts the payload.
+10. The app on endpoint B forwards the radar payload to the radar simulator.
+11. Endpoint B shows the radar track.
+
+On the other hand, a basic data transfer using PQC is as follow:
+1. Endpoint A simulates a radar track.
+2. The app on endpoint A receives the track payload.
+3. The apps on endpoints A and B generate a cryptographic key using ML-KEM.
+4. The app on endpoint A encrypts the payload using the generated key.
+6. The app on endpoint A signs with a PQC standard the encrypted message.
+7. The app on endpoint A transmits the signed encrypted message to the app on endpoint B.
+8. The app on endpoint B receives the signed encrypted message.
+9. The app on endpoint B checks the signature using the public key.
+10. The app on endpoint B decrypts the payload using the previous generated ML-KEM key.
+11. The app on endpoint B forwards the radar payload to the radar simulator.
+12. Endpoint B shows the radar track.
 
 An enhanced version of the system that performs fallback between both key exchange methods is also provided. It follows the same scheme, but if either the transmitter or receiver fail to perform the QKD key exchange, they will switch to PQC. The fallback is also performed to attempt to correct other errors in transmission. The fallback is only attempted once per payload.
 
