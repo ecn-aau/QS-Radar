@@ -5,7 +5,7 @@ import numpy as np
 
 if __name__ == "__main__":
 
-    num_samples = 10**5
+    num_samples = 10**5 # TODO: I can make this dynamic
 
     # Path to your log file
     logA_file_path = "../data/hybrid/ML-DSA-87/logA.log"

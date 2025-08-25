@@ -6,8 +6,8 @@ import numpy as np
 if __name__ == "__main__":
 
     # Path to your log file
-    logA_file_path = "../data/ML-KEM-1024/ML-DSA-87/logA.log"
-    logB_file_path = "../data/ML-KEM-1024/ML-DSA-87/logB.log"
+    logA_file_path = "../data/ML-KEM-512/ML-DSA-87/logA.log"
+    logB_file_path = "../data/ML-KEM-512/ML-DSA-87/logB.log"
 
     # Read the log file
     logA_lines = read_log_file(logA_file_path)
@@ -288,7 +288,7 @@ if __name__ == "__main__":
     err_rate_PQC_key_B = 0 # Placeholder
     err_rate_encrypt_B = 0 # Placeholder
     err_rate_sign_B = 0 # Placeholder
-    err_rate_crypto_B = err_rate_QKD_key_B + err_rate_encrypt_B + err_rate_sign_B
+    err_rate_crypto_B = err_rate_QKD_key_B + err_rate_PQC_key_B + err_rate_encrypt_B + err_rate_sign_B
 
     # Calculate payload metrics
     # - Mean
