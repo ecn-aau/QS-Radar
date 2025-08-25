@@ -104,7 +104,7 @@ def get_public_key() -> bytes:
     return base64.b64decode(public_key)
 
 app = Flask(__name__)
-app.secret_key = bytearray(32) # WARNING: Not the intended use of this variable
+app.secret_key = bytearray(32) # WARNING: Not the intended use of this variable (development only)
 
 @app.route('/data', methods=['POST'])
 def handle_data():
