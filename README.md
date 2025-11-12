@@ -4,25 +4,42 @@ Scripts to run an experimental Quantum Safe (QS) Radar communication between two
 
 ## Description
 
-Two scripts, one for each endpoint, run a web application that uses UDP over HTTP to transfer data between each other. Endpoint A is the generator (the Radar), while endpoint B is the receiver (the Command-and-Control center). The applications pull keys using the ETSI014 standard for requesting symmetric cryptographic keys from Quantum Key Distribution (QKD) systems. The applications also use NIST standards for Post-Quantum Cryptography (PQC) for signing encrypted data. The endpoints simulate radar data following the ASTERIX protocol.
+Two scripts, one for each endpoint, run a web application that uses UDP over HTTP to transfer data between each other. Endpoint A is the transmitter (the Radar), while endpoint B is the receiver (the Command-and-Control center). The applications pull keys using the ETSI014 standard for requesting symmetric cryptographic keys from Quantum Key Distribution (QKD) systems. Alternatively, they can use NIST standards for Post-Quantum Cryptography (PQC) for key exchange, namely, ML-KEM-512/768/1024. The applications also use NIST standards for PQC for signing encrypted data, namely, ML-DSA-44/65/87. The endpoints simulate radar data following the ASTERIX protocol (cat 062).
 
-A basic data transfer is as follows:
+A basic data transfer using QKD is as follows:
 1. Endpoint A simulates a radar track.
 2. The app on endpoint A receives the track payload.
 3. The app on endpoint A pulls a cryptographic key using ETSI014 and encrypts the payload.
-4. The app on endpoint A signs with a PQC standard the encrypted message.
-5. The app on endpoint A transmits the signed encrypted message to the app on endpoint B.
-6. The app on endpoint B receives the signed encrypted message.
-7. The app on endpoint B checks the signature using the public key.
-8. The app on endpoint B pulls the same cryptographic key (based on key ID) using ETSI014 and decrypts the payload.
-9. The app on endpoint B forwards the radar payload to the radar simulator.
-10. Endpoint B shows the radar track.
+4. The app on endpoint A encrypts the payload using the pulled key.
+5. The app on endpoint A signs with a PQC standard the encrypted message.
+6. The app on endpoint A transmits the signed encrypted message to the app on endpoint B.
+7. The app on endpoint B receives the signed encrypted message.
+8. The app on endpoint B checks the signature using the public key.
+9. The app on endpoint B pulls the same cryptographic key (based on key ID) using ETSI014 and decrypts the payload.
+10. The app on endpoint B forwards the radar payload to the radar simulator.
+11. Endpoint B shows the radar track.
+
+On the other hand, a basic data transfer using PQC is as follow:
+1. Endpoint A simulates a radar track.
+2. The app on endpoint A receives the track payload.
+3. The apps on endpoints A and B generate a cryptographic key using ML-KEM.
+4. The app on endpoint A encrypts the payload using the generated key.
+6. The app on endpoint A signs with a PQC standard the encrypted message.
+7. The app on endpoint A transmits the signed encrypted message to the app on endpoint B.
+8. The app on endpoint B receives the signed encrypted message.
+9. The app on endpoint B checks the signature using the public key.
+10. The app on endpoint B decrypts the payload using the previous generated ML-KEM key.
+11. The app on endpoint B forwards the radar payload to the radar simulator.
+12. Endpoint B shows the radar track.
+
+An enhanced version of the system that performs fallback between both key exchange methods is also provided. It follows the same scheme, but if either the transmitter or receiver fail to perform the QKD key exchange, they will switch to PQC. The fallback is also performed to attempt to correct other errors in transmission. The fallback is only attempted once per payload.
 
 ## Assumptions
 
 The scripts assume the following:
 * Key pulling through ETSI014 has to be externally handled.
 * The endpoints possess a public-private key pair for signing, with the private key held at endpoint A.
+* The enhanced version of the system assumes that QKD key exchange is the default option, and that PQC is the fallback.
 
 ## Requirements
 
@@ -47,15 +64,19 @@ Additionally, `ast-tool-py` is installed and run in parallel to the apps to simu
 
 ## Usage
 
-On each endpoint, run `clientA_HTTP` and `clientB_HTTP`, respectively. Moreover, run the following commands in parallel on endpoints A and B, respectively:
+On each endpoint, run `clientA.py` and `clientB.py`, respectively. For the enhanced fallback version, run  `clientA_enhanced.py` and `clientB_enhanced.py` instead. You can configure macros in the scripts to select which algorithms to use, as well as the number of payload to transmit. Moreover, run the following commands in parallel on endpoints A and B, respectively:
 ```
-ast-tool-py --empty-selection --cat 62 1.20 random --sleep 2 | ast-tool-py to-udp --unicast "*" <DESTINATION_IP> <DESTINATION_PORT>
+ast-tool-py --empty-selection --cat 62 1.20 random --sleep 1 | ast-tool-py to-udp --unicast "*" <DESTINATION_IP> <DESTINATION_PORT>
 ast-tool-py from-udp --unicast "ch1" <LISTENING_IP> <LISTENING_PORT> | ast-tool-py decode
 ```
 
 By default, the applications on endpoint A receives the data from the radar simulator at `<DESTINATION_IP>=127.0.0.1` and `<DESTINATION_PORT>=56000`. Meanwhile, the default for the application on endpoint B is `<LISTENING_IP>=127.0.0.1` and `<LISTENING_PORT>=56002`.
 
+## Data and Analytics
+
+This repository includes example log files in `\data` for different system configurations that have been generated by running the system on a physical testbed. You may also find utility scripts for parsing through the logs and obtaining metrics and data in `\util`.
+
 ## Acknowledgment
 
 Thank you to Martón Reiter for establishing the initial experimental setup during his MSc thesis:
-M. Reiter, "Thesis title (placeholder)," *Aalborg University*, Denmark, 2025.
+M. Reiter, "Design and Implementation of a Testbed Setup for Evaluating PQC and QKD Integration in Critical Infrastructure Environments," *Aalborg University*, Denmark, 2025.
