@@ -164,7 +164,7 @@ def plot_time_deltas_ccdf(
         ccdf[-1] = 1.0 / N
 
     # Plot CCDF as black line with blue sample points
-    plt.figure(figsize=(7, 6))
+    plt.figure(figsize=(7, 4))
     plt.plot(data, ccdf, linestyle='-', color='black')   # line
     plt.scatter(data, ccdf, color='blue', s=15, rasterized=True)          # points
 
@@ -193,7 +193,7 @@ def plot_time_deltas_ccdf(
                          f"p{p} = {value:.2f} ms",
                          # f"p{p} = {value:.0f} bytes",
                          rotation=90, verticalalignment='bottom',
-                         color='red', fontweight='bold', fontsize=10)
+                         color='red', fontweight='bold', fontsize=12)
 
     # Annotate maximum latency
     if show_max:
@@ -203,12 +203,14 @@ def plot_time_deltas_ccdf(
                  f"max = {max_val:.2f} ms",
                  # f"max = {max_val:.0f} bytes",
                  rotation=90, verticalalignment='bottom',
-                 color='red', fontweight='bold', fontsize=10)
+                 color='red', fontweight='bold', fontsize=12)
 
     # Labels and styling
-    plt.xlabel(xlabel)
-    plt.ylabel(ylabel)
-    # plt.title(title)
+    plt.xlabel(xlabel, fontsize=12)
+    plt.ylabel(ylabel, fontsize=12)
+    plt.xticks(fontsize=12)
+    plt.yticks(fontsize=12)
+    # plt.title(title, fontsize=13)
     plt.grid(True, linestyle='--', alpha=0.6)
 
     plt.tight_layout()
@@ -281,7 +283,7 @@ def plot_time_deltas_ccdf_multi(
         base_colors = ["blue", "green", "red", "purple", "orange", "brown", "pink", "gray"]
         colors = base_colors[:num_sets]
 
-    plt.figure(figsize=(14, 6))
+    plt.figure(figsize=(7, 4))
 
     # Track axis limits for annotations
     ymin, ymax = (None, None)
@@ -331,9 +333,10 @@ def plot_time_deltas_ccdf_multi(
                     value = np.percentile(data, p)
                     plt.axvline(value, color=color, linestyle='--', alpha=0.6)
                     plt.text(value + x_offset, ymin + y_offset,
-                             f"{label} p{p} = {value:.2f} ms",
+                             # f"{label} p{p} = {value:.2f} ms",
+                             f"p{p} = {value:.2f} ms",
                              rotation=90, verticalalignment='bottom',
-                             color=color, fontweight='bold', fontsize=10)
+                             color=color, fontweight='bold', fontsize=12)
 
     # Max annotations
     if show_max:
@@ -343,16 +346,19 @@ def plot_time_deltas_ccdf_multi(
             max_val = np.max(data)
             plt.axvline(max_val, color=color, linestyle='--', alpha=0.7)
             plt.text(max_val + x_offset, ymin + y_offset,
-                     f"{label} max = {max_val:.2f} ms",
+                     # f"{label} max = {max_val:.2f} ms",
+                     f"max = {max_val:.2f} ms",
                      rotation=90, verticalalignment='bottom',
-                     color=color, fontweight='bold', fontsize=10)
+                     color=color, fontweight='bold', fontsize=12)
 
     # Labels & layout
-    plt.xlabel(xlabel)
-    plt.ylabel(ylabel)
-    # plt.title(title)
+    plt.xlabel(xlabel, fontsize=12)
+    plt.ylabel(ylabel, fontsize=12)
+    plt.xticks(fontsize=12)
+    plt.yticks(fontsize=12)
+    # plt.title(title, fontsize=13)
     plt.grid(True, linestyle='--', alpha=0.6)
-    plt.legend()
+    plt.legend(fontsize=12)
     plt.tight_layout()
 
     if save_path:
