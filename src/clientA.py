@@ -8,15 +8,19 @@ import oqs
 
 from random import randbytes
 from Crypto.Cipher import AES
+from Crypto.PublicKey import RSA, ECC
+from Crypto.Hash import SHA256, SHAKE128
+from Crypto.Signature import pkcs1_15
+from Crypto.Protocol.DH import key_agreement as ECDH
 
 CLIENT_A_KMS_HOST = "192.168.3.126" # Address of KMS, maybe there is only one
 CLIENT_A_KMS_PORT = "8200"
 CLIENT_A_KMS_BASE_URL = f"https://{CLIENT_A_KMS_HOST}:{CLIENT_A_KMS_PORT}/api/v1" # KMS cert might be self-signed?
 CLIENT_B_ID = "Bob254250"
-KEY_EXCHANGE = "BB84" # Options: BB84, ML-KEM-512, ML-KEM-768, ML-DSA-1024
+KEY_EXCHANGE = "BB84" # Options: ECDH, BB84, ML-KEM-512, ML-KEM-768, ML-DSA-1024
 KEY_LENGTH = 256  # In bits
 KEY_AMOUNT = 1
-SIGALG = "ML-DSA-87"
+SIGALG = "ML-DSA-87" # Options: RSA, ML-DSA-44, ML-DSA-65, ML-DSA-87
 
 logging.basicConfig(
     filename="logA.log",
@@ -24,6 +28,11 @@ logging.basicConfig(
     datefmt="%Y-%m-%d %H:%M:%S",
     level=logging.DEBUG,
     filemode="x")
+
+
+def kdf(x):
+    return SHAKE128.new(x).read(32)
+
 
 def request_qkd_key() -> tuple[str, bytes]:
     get_key_url = f"{CLIENT_A_KMS_BASE_URL}/keys/{CLIENT_B_ID}/enc_keys"
@@ -71,11 +80,27 @@ def request_pqc_key() -> tuple[str, bytes]:
             "public_key": base64.b64encode(KEM_pb_key).decode(),
         }
 
-        response = requests.post(url="http://192.168.3.102:8080", json=payload, timeout=10)
+        response = requests.post(url="http://192.168.3.102:8080/kem", json=payload, timeout=10)
         response.raise_for_status()
         shared_secret = client.decap_secret(base64.b64decode(response.json()['ciphertext']))
 
         return payload['key_ID'], shared_secret
+
+
+def request_ecdh_key() -> tuple[str, bytes]:
+    KEM_pv_key = ECC.generate(curve='p256')
+
+    payload = {
+        "key_ID": base64.b64encode(randbytes(3)).decode(),
+        "public_key": KEM_pv_key.public_key().export_key(format='PEM'),
+    }
+
+    response = requests.post(url="http://192.168.3.102:8080/kem", json=payload, timeout=10)
+    response.raise_for_status()
+    KEM_pb_key = ECC.import_key(response.json()['public_key'])
+    shared_secret = ECDH(eph_priv=KEM_pv_key, eph_pub=KEM_pb_key, kdf=kdf)
+
+    return payload['key_ID'], shared_secret
 
 
 def encrypt_data(data: bytes, key: bytes) -> object:
@@ -92,7 +117,7 @@ def encrypt_data(data: bytes, key: bytes) -> object:
 
 def send_data(payload) -> None:
     try:
-        response = requests.post(url="http://192.168.3.102:8080", json=payload, timeout=10)
+        response = requests.post(url="http://192.168.3.102:8080/data", json=payload, timeout=10)
         response.raise_for_status()
     except requests.exceptions.HTTPError as http_err:
         print(f"HTTP error occurred: {http_err} - Status Code: {response.status_code}")
@@ -113,11 +138,21 @@ def get_private_key() -> bytes:
     private_key = data["private_key"]
     return base64.b64decode(private_key)
 
-def sign_data(encrypted_data: object, private_key: bytes) -> object:
+
+def sign_data_pqc(encrypted_data: object, private_key: bytes) -> object:
     signer = oqs.Signature(SIGALG, private_key)
     signature = signer.sign(json.dumps(encrypted_data, sort_keys=True).encode())
     encrypted_data["signature"] = base64.b64encode(signature).decode()
     return encrypted_data
+
+
+def sign_data_rsa(encrypted_data: object, private_key: bytes) -> object:
+    hash = SHA256.new(json.dumps(encrypted_data, sort_keys=True).encode())
+    rsa_key = RSA.import_key(private_key)
+    signature = pkcs1_15.new(rsa_key).sign(hash)
+    encrypted_data["signature"] = base64.b64encode(signature).decode()
+    return encrypted_data
+
 
 if __name__ == "__main__":
     logging.info(f"Starting QS-Radar: {SIGALG} + {KEY_EXCHANGE}")
@@ -152,6 +187,10 @@ if __name__ == "__main__":
                 logging.debug("QKD key request initiated")
                 key_ID, key = request_qkd_key()
                 logging.debug(f"QKD key collected: size {KEY_LENGTH}, ID {key_ID}")
+            elif KEY_EXCHANGE == "ECDH":
+                logging.debug("Classical key request initiated")
+                key_ID, key = request_ecdh_key()
+                logging.debug(f"Classical key collected: ID {key_ID}")
             else:
                 logging.debug("PQC key request initiated")
                 key_ID, key = request_pqc_key()
@@ -161,7 +200,10 @@ if __name__ == "__main__":
             encrypted_data["key_ID"] = key_ID
             logging.debug(f"Encrypted data with key: ID {key_ID}")
 
-            payload = sign_data(encrypted_data=encrypted_data, private_key=pv_key)
+            if SIGALG == "RSA":
+                payload = sign_data_rsa(encrypted_data=encrypted_data, private_key=pv_key)
+            else:
+                payload = sign_data_pqc(encrypted_data=encrypted_data, private_key=pv_key)
             logging.debug(f"Signed data with private key: {SIGALG}")
 
             send_data(payload=payload)

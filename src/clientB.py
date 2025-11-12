@@ -7,6 +7,10 @@ import socket
 import oqs
 
 from Crypto.Cipher import AES
+from Crypto.PublicKey import RSA, ECC
+from Crypto.Hash import SHA256, SHAKE128
+from Crypto.Signature import pkcs1_15
+from Crypto.Protocol.DH import key_agreement as ECDH
 from flask import Flask, request, jsonify
 
 
@@ -14,8 +18,8 @@ CLIENT_B_KMS_HOST = "192.168.3.128" # Address of KMS, maybe there is only one
 CLIENT_B_KMS_PORT = "8200"
 CLIENT_B_KMS_BASE_URL = f"https://{CLIENT_B_KMS_HOST}:{CLIENT_B_KMS_PORT}/api/v1" # KMS cert might be self-signed?
 CLIENT_A_ID = "Alice254250"
-KEY_EXCHANGE = "BB84" # Options: BB84, ML_KEM-512, ML-KEM-768, ML-KEM-1024
-SIGALG = "ML-DSA-87"
+KEY_EXCHANGE = "BB84" # Options: ECDH, BB84, ML_KEM-512, ML-KEM-768, ML-KEM-1024
+SIGALG = "ML-DSA-87" # Options: RSA, ML-DSA-44, ML-DSA-65, ML-DSA-87
 
 logging.basicConfig(
     filename="logB.log",
@@ -23,6 +27,11 @@ logging.basicConfig(
     datefmt="%Y-%m-%d %H:%M:%S",
     level=logging.DEBUG,
     filemode="x")
+
+
+def kdf(x):
+    return SHAKE128.new(x).read(32)
+
 
 def request_qkd_key_with_ID(key_ID: str) -> bytes:
     get_key_with_IDs_url = f"{CLIENT_B_KMS_BASE_URL}/keys/{CLIENT_A_ID}/dec_keys"
@@ -94,14 +103,25 @@ def verify_signature(payload: object, public_key: bytes) -> bool:
     }
     message = json.dumps(signed_data, sort_keys=True).encode()
 
-    with oqs.Signature(SIGALG) as verifier:
-        return verifier.verify(message, signature, public_key)
+    if SIGALG == "RSA":
+        hash = SHA256.new(message)
+        rsa_key = RSA.import_key(public_key)
+        try:
+            pkcs1_15.new(rsa_key).verify(hash, signature)
+            return True
+        except (ValueError, TypeError):
+            return False
+    else:
+        with oqs.Signature(SIGALG) as verifier:
+            return verifier.verify(message, signature, public_key)
+
 
 def get_public_key() -> bytes:
     with open("../keys/ppk-"+SIGALG+".json", "r") as file:
         data = json.load(file)
     public_key = data["public_key"]
     return base64.b64decode(public_key)
+
 
 app = Flask(__name__)
 app.secret_key = bytearray(32) # WARNING: Not the intended use of this variable (development only)
@@ -152,13 +172,18 @@ def handle_kem():
 
     logging.debug(f"Received KEM request: ID {payload['key_ID']}")
 
-    with oqs.KeyEncapsulation(KEY_EXCHANGE) as server:
-        KEM_pb_key = base64.b64decode(payload['public_key'])
-        ciphertext, shared_secret = server.encap_secret(KEM_pb_key)
-
-    app.secret_key = shared_secret
-
-    return jsonify({'status': 'success', 'ciphertext': base64.b64encode(ciphertext).decode()}), 200
+    if KEY_EXCHANGE == "ECDH":
+        KEM_pv_key = ECC.generate(curve='p256')
+        KEM_pb_key = ECC.import_key(payload['public_key'])
+        shared_secret = ECDH(eph_priv=KEM_pv_key, eph_pub=KEM_pb_key, kdf=kdf)
+        app.secret_key = shared_secret
+        return jsonify({'status': 'success', 'public_key': KEM_pv_key.public_key().export_key()}), 200
+    else:
+        with oqs.KeyEncapsulation(KEY_EXCHANGE) as server:
+            KEM_pb_key = base64.b64decode(payload['public_key'])
+            ciphertext, shared_secret = server.encap_secret(KEM_pb_key)
+        app.secret_key = shared_secret
+        return jsonify({'status': 'success', 'ciphertext': base64.b64encode(ciphertext).decode()}), 200
 
 if __name__ == '__main__':
     logging.info(f"Starting QS-Radar-C2: {SIGALG} + {KEY_EXCHANGE}")
